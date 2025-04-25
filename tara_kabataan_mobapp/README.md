@@ -1,16 +1,20 @@
-# tara_kabataan_mobapp
+## 🚀 Getting Started
 
-A new Flutter project.
+Follow these steps to run the app locally:
 
-## Getting Started
+### 1. Clone the repository
 
-This project is a starting point for a Flutter application.
+### 2. Setups
 
-A few resources to get you started if this is your first Flutter project:
+flutter upgrade
+flutter pub get
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+--run an emulator
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+flutter run
+
+### 3. Reminders
+
+Blog images are stored in: /tara-kabataan/tara-kabataan-webapp/uploads/blogs-images/
+Event images are stored in: /tara-kabataan/tara-kabataan-webapp/uploads/events-images/
+
