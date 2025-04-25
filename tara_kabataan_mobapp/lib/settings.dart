@@ -125,7 +125,7 @@ class SettingsPage extends StatelessWidget {
                       style: TextStyle(
                         fontFamily: 'Bogart',
                         fontWeight: FontWeight.w600,
-                        fontSize: 35,
+                        fontSize: 25,
                         color: Colors.white,
                       ),
                     ),
