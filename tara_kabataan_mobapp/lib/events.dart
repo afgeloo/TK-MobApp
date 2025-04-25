@@ -321,7 +321,7 @@ class EventsPage extends StatelessWidget {
                               );
                             },
                             cells: [
-                              DataCell(SizedBox(width: 60, child: Text(event['category'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
+                              DataCell(SizedBox(width: 60, child: Text(event['category'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Color(0xFFFF5A89))))),
                               DataCell(SizedBox(width: 80, child: Text(event['title'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
                               DataCell(SizedBox(width: 60, child: Text(event['event_status'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
                               DataCell(SizedBox(width: 60, child: Text(formatDate(event['created_at'] ?? ''), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
