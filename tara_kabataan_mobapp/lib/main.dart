@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'blogs.dart';
 
-
 void main() {
   runApp(const MyApp());
 }
