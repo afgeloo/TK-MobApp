@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'blogs.dart';
 import 'settings.dart';
+import 'map_picker.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 // Fetch Events Data
 Future<List<Map<String, dynamic>>> fetchEvents() async {
@@ -175,14 +177,17 @@ class EventsPage extends StatelessWidget {
                     color: Color(0xFF3D3D3D),
                   ),
                 ),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF00A3FF),
-                    shape: BoxShape.circle,
+                GestureDetector(
+                  onTap: () => showAddEventDialog(context),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00A3FF),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add, color: Colors.white, size: 20),
                   ),
-                  child: const Icon(Icons.add, color: Colors.white, size: 20),
                 ),
               ],
             ),
@@ -392,4 +397,376 @@ class _SidebarButton extends StatelessWidget {
       ),
     );
   }
+}
+
+String getDayOfWeek(int weekday) {
+  switch (weekday) {
+    case 1:
+      return "Monday";
+    case 2:
+      return "Tuesday";
+    case 3:
+      return "Wednesday";
+    case 4:
+      return "Thursday";
+    case 5:
+      return "Friday";
+    case 6:
+      return "Saturday";
+    case 7:
+      return "Sunday";
+    default:
+      return "";
+  }
+}
+
+Future<void> openMapPicker(BuildContext context, TextEditingController venueController) async {
+  final LatLng? pickedLocation = await Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => MapPickerScreen()),
+  );
+
+  if (pickedLocation != null) {
+    venueController.text = '${pickedLocation.latitude}, ${pickedLocation.longitude}';
+  }
+}
+
+
+Future<void> showAddEventDialog(BuildContext context) async {
+  String? selectedCategory;
+  String? selectedStatus;
+  final TextEditingController titleController = TextEditingController();
+  final TextEditingController contentController = TextEditingController();
+  final TextEditingController speakerController = TextEditingController();
+  final TextEditingController venueController = TextEditingController();
+  final TextEditingController dateController = TextEditingController();
+  final TextEditingController dayController = TextEditingController();
+  final TextEditingController timeController = TextEditingController();
+
+
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return Dialog(
+            backgroundColor: const Color(0xFFFFF6F6),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width,   // <<<--- FULL SCREEN WIDTH
+              height: MediaQuery.of(context).size.height, // <<<--- FULL SCREEN HEIGHT (optional if you want)
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // -- everything you wrote inside --
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'ADD EVENT',
+                            style: TextStyle(
+                              fontFamily: 'Bogart',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 24,
+                              color: Color(0xFF3D3D3D),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.of(context).pop(),
+                            child: const Icon(Icons.close, size: 28, color: Colors.black54),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      const Text('Title', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: titleController,
+                        decoration: const InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Image', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 180,
+                        color: Colors.grey[200],
+                        alignment: Alignment.center,
+                        child: const Text("Image Preview Here"),
+                      ),
+                      const SizedBox(height: 1),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end, // Align buttons to the right
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(100, 20),
+                              backgroundColor: const Color(0xFF4DB1E3), // Upload blue
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            child: const Text('Upload'),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(100, 20),
+                              backgroundColor: const Color(0xFFE94B4B), // Remove red
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            child: const Text('Remove'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text('Category', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: selectedCategory,
+                        decoration: const InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        items: ['Seminar', 'Outreach', 'Training']
+                            .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
+                            .toList(),
+                        onChanged: (val) => selectedCategory = val,
+                      ),
+                      // Venue Field
+                      const SizedBox(height: 12),
+                      const Text('Venue', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: venueController,
+                        readOnly: true,
+                        onTap: () async {
+                          await openMapPicker(context, venueController);
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          suffixIcon: const Icon(Icons.location_on_outlined, size: 15, color: Colors.grey),
+                          suffixIconConstraints: const BoxConstraints(
+                            minHeight: 24,
+                            minWidth: 24,
+                            maxHeight: 24,
+                            maxWidth: 24,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Date, Day and Time Row
+                      Row(
+                        children: [
+                          // Date
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: dateController,
+                                  readOnly: true,
+                                  onTap: () async {
+                                    final DateTime? picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      dateController.text = "${picked.month}/${picked.day}/${picked.year}";
+                                      // Optional: auto-fill Day field
+                                      dayController.text = getDayOfWeek(picked.weekday);
+                                    }
+                                  },
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    suffixIcon: const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+                                    suffixIconConstraints: const BoxConstraints(
+                                      minHeight: 24,
+                                      minWidth: 24,
+                                      maxHeight: 24,
+                                      maxWidth: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          // Day
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Day', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: dayController,
+                                  readOnly: true,
+                                  decoration: const InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Time
+                      const Text('Time', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: timeController,
+                        readOnly: true,
+                        onTap: () async {
+                          final TimeOfDay? picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (picked != null) {
+                            timeController.text = picked.format(context);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          suffixIcon: const Icon(Icons.access_time, size: 15, color: Colors.grey),
+                          suffixIconConstraints: const BoxConstraints(
+                            minHeight: 24,
+                            minWidth: 24,
+                            maxHeight: 24,
+                            maxWidth: 24,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: selectedStatus,
+                        decoration: const InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                        items: ['Active', 'Upcoming', 'Completed']
+                            .map((stat) => DropdownMenuItem(value: stat, child: Text(stat)))
+                            .toList(),
+                        onChanged: (val) => selectedStatus = val,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Speakers', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                          controller: speakerController,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      const Text('Content', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: contentController,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end, // 👈 move to right
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(150, 20),
+                              backgroundColor: const Color.fromARGB(255, 54, 230, 139),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6), // 👈 minimal roundness
+                              ),
+                            ),
+                            child: const Text(
+                              'Add Event',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
 }
