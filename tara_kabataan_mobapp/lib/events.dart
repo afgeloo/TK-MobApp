@@ -181,7 +181,7 @@ class EventsPage extends StatelessWidget {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () => showAddEventDialog(context),
+                  onTap: () => showEventDialog(context),
                   child: Container(
                     width: 40,
                     height: 40,
@@ -282,25 +282,35 @@ class EventsPage extends StatelessWidget {
                                   return AlertDialog(
                                     backgroundColor: const Color(0xFFFFF6F6),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                     contentPadding: const EdgeInsets.all(24),
                                     content: SingleChildScrollView(
                                       child: Column(
+                                        mainAxisSize: MainAxisSize.min,
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.close, color: Colors.black54),
+                                                onPressed: () => Navigator.of(context).pop(),
+                                              ),
+                                            ],
+                                          ),
                                           if (event['image_url'] != null && event['image_url'].toString().isNotEmpty)
-                                                SizedBox(
-                                                height: 180,
-                                                width: double.infinity,
-                                                child: ClipRRect(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  child: Image.network(
-                                                    'http://10.0.2.2${event['image_url']}',
-                                                    fit: BoxFit.cover,
-                                                  ),
+                                            SizedBox(
+                                              height: 180,
+                                              width: double.infinity,
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(12),
+                                                child: Image.network(
+                                                  'http://10.0.2.2${event['image_url']}',
+                                                  fit: BoxFit.cover,
                                                 ),
                                               ),
+                                            ),
                                           const SizedBox(height: 16),
                                           Text(
                                             "Title: ${event['title'] ?? 'N/A'}",
@@ -317,15 +327,69 @@ class EventsPage extends StatelessWidget {
                                             event['content'] ?? 'No content.',
                                             baseUrl: Uri.parse('http://10.0.2.2/tara-kabataan/'),
                                           ),
+                                          const SizedBox(height: 20),
+                                          Row(
+                                            children: [
+                                              Spacer(), // pushes buttons to the right
+                                              ElevatedButton.icon(
+                                                onPressed: () async {
+                                                  final confirm = await showDialog<bool>(
+                                                    context: context,
+                                                    builder: (context) => AlertDialog(
+                                                      title: const Text("Delete Event"),
+                                                      content: const Text("Are you sure you want to delete this event?"),
+                                                      actions: [
+                                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+                                                        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
+                                                      ],
+                                                    ),
+                                                  );
+
+                                                  if (confirm == true) {
+                                                    final deleteResponse = await http.post(
+                                                      Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_event.php'),
+                                                      headers: {'Content-Type': 'application/json'},
+                                                      body: jsonEncode({"event_id": event['event_id']}),
+                                                    );
+
+                                                    final deleteResult = jsonDecode(deleteResponse.body);
+                                                    if (deleteResult['success']) {
+                                                      Navigator.of(context).pop(); // Close the modal
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        const SnackBar(content: Text("Event deleted successfully.")),
+                                                      );
+                                                    } else {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        SnackBar(content: Text("Failed to delete: ${deleteResult['error']}")),
+                                                      );
+                                                    }
+                                                  }
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFFE94B4B), // red
+                                                  foregroundColor: Colors.white,
+                                                ),
+                                                icon: const Icon(Icons.delete),
+                                                label: const Text("Delete"),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              ElevatedButton.icon(
+                                                onPressed: () {
+                                                  Navigator.of(context).pop(); // Close the current view modal
+                                                  showEventDialog(context, isEdit: true, eventData: event);
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFF4DB1E3), // blue
+                                                  foregroundColor: Colors.white,
+                                                ),
+                                                icon: const Icon(Icons.edit),
+                                                label: const Text("Edit"),
+                                              ),
+                                            ],
+                                          ),
                                         ],
                                       ),
                                     ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.of(context).pop(),
-                                        child: const Text("Close"),
-                                      ),
-                                    ],
                                   );
                                 },
                               );
@@ -457,8 +521,12 @@ Future<String?> uploadEventImage(img_picker.XFile imageFile) async {
   }
 }
 
-Future<void> showAddEventDialog(BuildContext context) async {
-  debugPrint('ImagePicker initialized: ${img_picker.ImagePicker().toString()}');
+Future<void> showEventDialog(
+  BuildContext context, {
+  bool isEdit = false,
+  Map<String, dynamic>? eventData,
+}) async {
+  TimeOfDay? pickedStartTime;
   img_picker.XFile? pickedImage;
   String? uploadedImageUrl;
   final img_picker.ImagePicker picker = img_picker.ImagePicker();
@@ -471,14 +539,25 @@ Future<void> showAddEventDialog(BuildContext context) async {
   final TextEditingController dateController = TextEditingController();
   final TextEditingController dayController = TextEditingController();
   final TextEditingController timeController = TextEditingController();
+  final TextEditingController timeControllerEnd = TextEditingController();
 
+  // If editing, pre-fill fields and existing image URL
+  if (isEdit && eventData != null) {
+    titleController.text = eventData['title'] ?? '';
+    speakerController.text = eventData['event_speakers'] ?? '';
+    contentController.text = eventData['content'] ?? '';
+    venueController.text = eventData['event_venue'] ?? '';
+    selectedCategory = eventData['category'];
+    selectedStatus = eventData['event_status'];
+    uploadedImageUrl = eventData['image_url'];
+  }
 
   await showDialog(
     context: context,
     barrierDismissible: false,
     builder: (BuildContext context) {
       return StatefulBuilder(
-        builder: (BuildContext context, StateSetter setModalState) {
+        builder: (context, setModalState) {
           return Dialog(
             backgroundColor: const Color(0xFFFFF6F6),
             insetPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -486,22 +565,21 @@ Future<void> showAddEventDialog(BuildContext context) async {
               borderRadius: BorderRadius.circular(10),
             ),
             child: SizedBox(
-              width: MediaQuery.of(context).size.width,   // <<<--- FULL SCREEN WIDTH
-              height: MediaQuery.of(context).size.height, // <<<--- FULL SCREEN HEIGHT (optional if you want)
+              width: MediaQuery.of(context).size.width,
+              height: MediaQuery.of(context).size.height,
               child: SingleChildScrollView(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // -- everything you wrote inside --
+                      // Header
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'ADD EVENT',
-                            style: TextStyle(
+                          Text(
+                            isEdit ? 'EDIT EVENT' : 'ADD EVENT',
+                            style: const TextStyle(
                               fontFamily: 'Bogart',
                               fontWeight: FontWeight.w900,
                               fontSize: 24,
@@ -515,6 +593,8 @@ Future<void> showAddEventDialog(BuildContext context) async {
                         ],
                       ),
                       const SizedBox(height: 20),
+
+                      // Title
                       const Text('Title', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
                       TextField(
@@ -528,6 +608,8 @@ Future<void> showAddEventDialog(BuildContext context) async {
                         ),
                       ),
                       const SizedBox(height: 12),
+
+                      // Image
                       const Text('Image', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
                       Container(
@@ -535,55 +617,66 @@ Future<void> showAddEventDialog(BuildContext context) async {
                         color: Colors.grey[200],
                         alignment: Alignment.center,
                         child: pickedImage != null
-                          ? Image.file(File(pickedImage!.path), fit: BoxFit.cover)
-                          : const Text("Image Preview Here"),
+                            ? Image.file(File(pickedImage!.path), fit: BoxFit.cover)
+                            : (uploadedImageUrl != null
+                                ? Image.network(
+                                    'http://10.0.2.2$uploadedImageUrl',
+                                    fit: BoxFit.cover,
+                                  )
+                                : const Text("Image Preview Here")),
                       ),
-                      const SizedBox(height: 1),
+                      const SizedBox(height: 6),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.end, // Align buttons to the right
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           ElevatedButton(
                             onPressed: () async {
-                              final img_picker.XFile? image = await picker.pickImage(source: img_picker.ImageSource.gallery);
+                              final img_picker.XFile? image =
+                                  await picker.pickImage(source: img_picker.ImageSource.gallery);
                               if (image != null) {
                                 setModalState(() {
                                   pickedImage = image;
                                 });
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("Image selected. It will be uploaded when you add the event.")),
+                                  const SnackBar(
+                                    content: Text("Image selected. It will be saved on submit."),
+                                  ),
                                 );
                               }
                             },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size(100, 20),
-                              backgroundColor: const Color(0xFF4DB1E3), // Upload blue
+                              backgroundColor: const Color(0xFF4DB1E3),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(5),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                               textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             child: const Text('Upload'),
                           ),
                           const SizedBox(width: 12),
                           ElevatedButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              setModalState(() {
+                                pickedImage = null;
+                                uploadedImageUrl = null;
+                              });
+                            },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size(100, 20),
-                              backgroundColor: const Color(0xFFE94B4B), // Remove red
+                              backgroundColor: const Color(0xFFE94B4B),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(5),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                               textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             child: const Text('Remove'),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 12),
+
+                      // Category
                       const Text('Category', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
@@ -600,137 +693,24 @@ Future<void> showAddEventDialog(BuildContext context) async {
                             .toList(),
                         onChanged: (val) => selectedCategory = val,
                       ),
-                      // Venue Field
                       const SizedBox(height: 12),
+
+                      // Venue (Map Picker)
                       const Text('Venue', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
                       TextField(
                         controller: venueController,
                         readOnly: true,
                         onTap: () async {
-                          await openMapPicker(context, venueController);
-                        },
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          suffixIcon: const Icon(Icons.location_on_outlined, size: 15, color: Colors.grey),
-                          suffixIconConstraints: const BoxConstraints(
-                            minHeight: 24,
-                            minWidth: 24,
-                            maxHeight: 24,
-                            maxWidth: 24,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Date, Day and Time Row
-                      Row(
-                        children: [
-                          // Date
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 6),
-                                TextField(
-                                  controller: dateController,
-                                  readOnly: true,
-                                  onTap: () async {
-                                    final DateTime now = DateTime.now();
-                                    final DateTime? picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: now,
-                                      firstDate: now, // 👈 Disables past dates
-                                      lastDate: DateTime(2100),
-                                    );
-                                    if (picked != null) {
-                                      dateController.text = "${picked.month}/${picked.day}/${picked.year}";
-                                      dayController.text = getDayOfWeek(picked.weekday);
-                                    }
-                                  },
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    suffixIcon: const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-                                    suffixIconConstraints: const BoxConstraints(
-                                      minHeight: 24,
-                                      minWidth: 24,
-                                      maxHeight: 24,
-                                      maxWidth: 24,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-
-                          // Day
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Day', style: TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 6),
-                                TextField(
-                                  controller: dayController,
-                                  readOnly: true,
-                                  decoration: const InputDecoration(
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Time
-                      const Text('Time', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: timeController,
-                        readOnly: true,
-                        onTap: () async {
-                          final TimeOfDay? picked = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.now(),
+                          final LatLng? pickedLocation = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => MapPickerScreen()),
                           );
-                          if (picked != null) {
-                            // Combine picked time with selected date
-                            final selectedDate = DateFormat("MM/dd/yyyy").parse(dateController.text);
-                            final pickedDateTime = DateTime(
-                              selectedDate.year,
-                              selectedDate.month,
-                              selectedDate.day,
-                              picked.hour,
-                              picked.minute,
-                            );
-
-                            final now = DateTime.now();
-                            if (pickedDateTime.isBefore(now)) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Time cannot be in the past.")),
-                              );
-                              return;
-                            }
-
-                            timeController.text = picked.format(context);
+                          if (pickedLocation != null) {
+                            setModalState(() {
+                              venueController.text =
+                                  '${pickedLocation.latitude}, ${pickedLocation.longitude}';
+                            });
                           }
                         },
                         decoration: InputDecoration(
@@ -738,39 +718,208 @@ Future<void> showAddEventDialog(BuildContext context) async {
                           fillColor: Colors.white,
                           border: InputBorder.none,
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          suffixIcon: const Icon(Icons.access_time, size: 15, color: Colors.grey),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          suffixIcon:
+                              const Icon(Icons.location_on_outlined, size: 15, color: Colors.grey),
                           suffixIconConstraints: const BoxConstraints(
-                            minHeight: 24,
-                            minWidth: 24,
-                            maxHeight: 24,
-                            maxWidth: 24,
+                            minHeight: 24, minWidth: 24, maxHeight: 24, maxWidth: 24,
                           ),
                         ),
                       ),
                       const SizedBox(height: 12),
+
+                      // Only for "Add" mode: Date, Day, Start & End time
+                      if (!isEdit) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: dateController,
+                                    readOnly: true,
+                                    onTap: () async {
+                                      final now = DateTime.now();
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: now,
+                                        firstDate: now,
+                                        lastDate: DateTime(2100),
+                                      );
+                                      if (picked != null) {
+                                        setModalState(() {
+                                          dateController.text =
+                                              "${picked.month}/${picked.day}/${picked.year}";
+                                          dayController.text = getDayOfWeek(picked.weekday);
+                                        });
+                                      }
+                                    },
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      suffixIcon:
+                                          const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+                                      suffixIconConstraints: const BoxConstraints(
+                                          minHeight: 24, minWidth: 24, maxHeight: 24, maxWidth: 24),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Day', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: dayController,
+                                    readOnly: true,
+                                    decoration: const InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Time Start',
+                                      style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 4),
+                                  TextField(
+                                    controller: timeController,
+                                    readOnly: true,
+                                    onTap: () async {
+                                      final picked = await showTimePicker(
+                                        context: context,
+                                        initialTime: TimeOfDay.now(),
+                                      );
+                                      if (picked != null) {
+                                        final selectedDate =
+                                            DateFormat("MM/dd/yyyy").parse(dateController.text);
+                                        final dt = DateTime(selectedDate.year, selectedDate.month,
+                                            selectedDate.day, picked.hour, picked.minute);
+                                        if (dt.isBefore(DateTime.now())) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                                content: Text("Start time cannot be in the past.")),
+                                          );
+                                          return;
+                                        }
+                                        setModalState(() {
+                                          pickedStartTime = picked;
+                                          timeController.text = picked.format(context);
+                                        });
+                                      }
+                                    },
+                                    decoration: const InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      suffixIcon: Icon(Icons.access_time, size: 15, color: Colors.grey),
+                                      suffixIconConstraints:
+                                          BoxConstraints(minHeight: 24, minWidth: 24),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Time End',
+                                      style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 4),
+                                  TextField(
+                                    controller: timeControllerEnd,
+                                    readOnly: true,
+                                    onTap: () async {
+                                      final picked = await showTimePicker(
+                                        context: context,
+                                        initialTime: TimeOfDay.now(),
+                                      );
+                                      if (picked != null) {
+                                        if (pickedStartTime == null) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                                content:
+                                                    Text("Please select the start time first.")),
+                                          );
+                                          return;
+                                        }
+                                        final selectedDate =
+                                            DateFormat("MM/dd/yyyy").parse(dateController.text);
+                                        final start = DateTime(
+                                            selectedDate.year,
+                                            selectedDate.month,
+                                            selectedDate.day,
+                                            pickedStartTime!.hour,
+                                            pickedStartTime!.minute);
+                                        final end = DateTime(selectedDate.year, selectedDate.month,
+                                            selectedDate.day, picked.hour, picked.minute);
+                                        if (end.isBefore(start)) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                                content: Text("End time cannot be before start.")),
+                                          );
+                                          return;
+                                        }
+                                        setModalState(() {
+                                          timeControllerEnd.text = picked.format(context);
+                                        });
+                                      }
+                                    },
+                                    decoration: const InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      suffixIcon: Icon(Icons.access_time, size: 15, color: Colors.grey),
+                                      suffixIconConstraints:
+                                          BoxConstraints(minHeight: 24, minWidth: 24),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // Status (with limited choices when editing)
                       const Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        value: selectedStatus,
-                        decoration: const InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                        items: ['Ongoing', 'Upcoming', 'Completed']
-                            .map((stat) => DropdownMenuItem(value: stat, child: Text(stat)))
-                            .toList(),
-                        onChanged: (val) => selectedStatus = val,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text('Speakers', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      TextField(
-                          controller: speakerController,
-                          maxLines: 3,
+                      isEdit? DropdownButtonFormField<String>(
+                          value: selectedStatus,
                           decoration: const InputDecoration(
                             filled: true,
                             fillColor: Colors.white,
@@ -778,8 +927,41 @@ Future<void> showAddEventDialog(BuildContext context) async {
                             isDense: true,
                             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
+                          items: ['UPCOMING', 'CANCELLED']
+                              .map((stat) => DropdownMenuItem(value: stat, child: Text(stat)))
+                              .toList(),
+                          onChanged: (val) => selectedStatus = val,
+                        )
+                      : const TextField(
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            hintText: 'UPCOMING',
+                          ),
                         ),
                       const SizedBox(height: 12),
+
+                      // Speakers
+                      const Text('Speakers', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: speakerController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Content
                       const Text('Content', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
                       TextField(
@@ -793,51 +975,70 @@ Future<void> showAddEventDialog(BuildContext context) async {
                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 20),
+
+                      // Submit button
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.end, // 👈 move to right
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           ElevatedButton(
                             onPressed: () async {
-                              if (titleController.text.isEmpty || pickedImage == null) {
+                              // Basic validation
+                              if (titleController.text.isEmpty ||
+                                  (!isEdit && pickedImage == null && uploadedImageUrl == null)) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("Title and image are required")),
+                                  const SnackBar(
+                                      content: Text("Title and image are required")),
                                 );
                                 return;
                               }
 
-                              // 🔁 Upload the image here
-                              final uploadedUrl = await uploadEventImage(pickedImage!);
-                              if (uploadedUrl == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("Image upload failed. Try again.")),
-                                );
-                                return;
+                              // If a new image was picked, upload it
+                              if (pickedImage != null) {
+                                final url = await uploadEventImage(pickedImage!);
+                                if (url == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text("Image upload failed. Try again.")),
+                                  );
+                                  return;
+                                }
+                                uploadedImageUrl = url;
                               }
 
-                              final Map<String, dynamic> newEvent = {
-                                "title": titleController.text,
-                                "category": selectedCategory ?? "Uncategorized",
-                                "event_date": dateController.text,
-                                "event_start_time": timeController.text,
-                                "event_end_time": timeController.text,
-                                "event_venue": venueController.text,
-                                "event_status": selectedStatus ?? "UPCOMING",
-                                "event_speakers": speakerController.text,
-                                "content": contentController.text,
-                                "image_url": uploadedUrl,
+                              // Build payload
+                              final payload = <String, dynamic>{
+                                if (isEdit) 'event_id': eventData!['event_id'],
+                                'title': titleController.text,
+                                'category': selectedCategory ?? 'Uncategorized',
+                                'event_venue': venueController.text,
+                                'event_status': isEdit ? (selectedStatus ?? 'UPCOMING') : 'UPCOMING',
+                                'event_speakers': speakerController.text,
+                                'content': contentController.text,
+                                'image_url': uploadedImageUrl,
+                                if (!isEdit) 'event_date': dateController.text,
+                                if (!isEdit) 'event_start_time': timeController.text,
+                                if (!isEdit) 'event_end_time': timeControllerEnd.text,
                               };
 
-                              final response = await http.post(
-                                Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event.php'),
-                                headers: {'Content-Type': 'application/json'},
-                                body: jsonEncode(newEvent),
-                              );
+                              final uri = Uri.parse(isEdit
+                                  ? 'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/update_event.php'
+                                  : 'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event.php');
 
+                              final response = await http.post(
+                                uri,
+                                headers: {'Content-Type': 'application/json'},
+                                body: jsonEncode(payload),
+                              );
                               final result = jsonDecode(response.body);
-                              if (result['success']) {
+
+                              if (result['success'] == true) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("Event added successfully")),
+                                  SnackBar(
+                                    content: Text(isEdit
+                                        ? "Event updated successfully"
+                                        : "Event added successfully"),
+                                  ),
                                 );
                                 Navigator.of(context).pop(); // Close modal
                               } else {
@@ -848,21 +1049,22 @@ Future<void> showAddEventDialog(BuildContext context) async {
                             },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size(150, 20),
-                              backgroundColor: const Color.fromARGB(255, 54, 230, 139),
+                              backgroundColor: isEdit
+                                  ? const Color.fromARGB(255, 54, 230, 139)
+                                  : const Color.fromARGB(255, 54, 230, 139),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 15, vertical: 5),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6), // 👈 minimal roundness
-                              ),
+                                  borderRadius: BorderRadius.circular(6)),
                             ),
-                            child: const Text(
-                              'Add Event',
-                              style: TextStyle(fontSize: 16),
+                            child: Text(
+                              isEdit ? 'Save Changes' : 'Add Event',
+                              style: const TextStyle(fontSize: 16),
                             ),
                           ),
                         ],
                       ),
-
                     ],
                   ),
                 ),
