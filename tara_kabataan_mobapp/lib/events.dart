@@ -319,7 +319,7 @@ class EventsPage extends StatelessWidget {
                                           const SizedBox(height: 8),
                                           Text("Category: ${event['category'] ?? 'N/A'}"),
                                           Text("Status: ${event['event_status'] ?? 'N/A'}"),
-                                          Text("Date: ${formatDate(event['created_at'] ?? '')}"),
+                                          Text("Date: ${formatDate(event['event_date'] ?? '')}"),
                                           const SizedBox(height: 8),
                                           const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
                                           const SizedBox(height: 4),
@@ -398,7 +398,7 @@ class EventsPage extends StatelessWidget {
                               DataCell(SizedBox(width: 60, child: Text(event['category'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Color(0xFFFF5A89))))),
                               DataCell(SizedBox(width: 80, child: Text(event['title'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
                               DataCell(SizedBox(width: 60, child: Text(event['event_status'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
-                              DataCell(SizedBox(width: 60, child: Text(formatDate(event['created_at'] ?? ''), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
+                              DataCell(SizedBox(width: 60, child: Text(formatDate(event['event_date'] ?? ''), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
                             ],
                           );
                         }).toList(),
@@ -550,6 +550,9 @@ Future<void> showEventDialog(
     selectedCategory = eventData['category'];
     selectedStatus = eventData['event_status'];
     uploadedImageUrl = eventData['image_url'];
+    dateController.text = eventData['event_date'] ?? '';
+    timeController.text = eventData['event_start_time'] ?? '';
+    timeControllerEnd.text = eventData['event_end_time'] ?? '';
   }
 
   await showDialog(
@@ -688,7 +691,7 @@ Future<void> showEventDialog(
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                        items: ['Seminar', 'Outreach', 'Training']
+                        items: ['KALUSUGAN', 'KALIKASAN', 'KARUNUNGAN', 'KULTURA', 'KASARIAN']
                             .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
                             .toList(),
                         onChanged: (val) => selectedCategory = val,
@@ -751,8 +754,7 @@ Future<void> showEventDialog(
                                       );
                                       if (picked != null) {
                                         setModalState(() {
-                                          dateController.text =
-                                              "${picked.month}/${picked.day}/${picked.year}";
+                                          dateController.text = DateFormat('yyyy-MM-dd').format(picked);
                                           dayController.text = getDayOfWeek(picked.weekday);
                                         });
                                       }
@@ -817,7 +819,7 @@ Future<void> showEventDialog(
                                       );
                                       if (picked != null) {
                                         final selectedDate =
-                                            DateFormat("MM/dd/yyyy").parse(dateController.text);
+                                            DateFormat("yyyy-MM-dd").parse(dateController.text);
                                         final dt = DateTime(selectedDate.year, selectedDate.month,
                                             selectedDate.day, picked.hour, picked.minute);
                                         if (dt.isBefore(DateTime.now())) {
@@ -874,7 +876,7 @@ Future<void> showEventDialog(
                                           return;
                                         }
                                         final selectedDate =
-                                            DateFormat("MM/dd/yyyy").parse(dateController.text);
+                                            DateFormat("yyyy-MM-dd").parse(dateController.text);
                                         final start = DateTime(
                                             selectedDate.year,
                                             selectedDate.month,
@@ -1016,9 +1018,9 @@ Future<void> showEventDialog(
                                 'event_speakers': speakerController.text,
                                 'content': contentController.text,
                                 'image_url': uploadedImageUrl,
-                                if (!isEdit) 'event_date': dateController.text,
-                                if (!isEdit) 'event_start_time': timeController.text,
-                                if (!isEdit) 'event_end_time': timeControllerEnd.text,
+                                'event_date': dateController.text,
+                                'event_start_time': timeController.text,
+                                'event_end_time': timeControllerEnd.text,
                               };
 
                               final uri = Uri.parse(isEdit
