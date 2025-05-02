@@ -253,7 +253,7 @@ class EventsPage extends StatelessWidget {
                         dataRowHeight: 60,
                         dividerThickness: 0,
                         showCheckboxColumn: false,
-                        headingRowColor: MaterialStateProperty.all(Colors.transparent),
+                        headingRowColor: WidgetStateProperty.all(Colors.transparent),
                         border: TableBorder(
                           horizontalInside: BorderSide.none,
                           top: BorderSide.none,

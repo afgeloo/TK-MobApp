@@ -261,7 +261,7 @@ class BlogsPage extends StatelessWidget {
                         dataRowHeight: 60,
                         dividerThickness: 0,
                         showCheckboxColumn: false,
-                        headingRowColor: MaterialStateProperty.all(
+                        headingRowColor: WidgetStateProperty.all(
                           Colors.transparent,
                         ),
                         border: TableBorder(
