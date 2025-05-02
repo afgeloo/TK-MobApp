@@ -7,6 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart' as img_picker;
+
 
 // Fetch Events Data
 Future<List<Map<String, dynamic>>> fetchEvents() async {
@@ -287,15 +290,17 @@ class EventsPage extends StatelessWidget {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           if (event['image_url'] != null && event['image_url'].toString().isNotEmpty)
-                                            ClipRRect(
-                                              borderRadius: BorderRadius.circular(12),
-                                              child: Image.network(
-                                                'http://10.0.2.2/tara-kabataan/tara-kabataan-webapp/uploads/events-images/${event['image_url']}',
+                                                SizedBox(
                                                 height: 180,
                                                 width: double.infinity,
-                                                fit: BoxFit.cover,
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  child: Image.network(
+                                                    'http://10.0.2.2${event['image_url']}',
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                ),
                                               ),
-                                            ),
                                           const SizedBox(height: 16),
                                           Text(
                                             "Title: ${event['title'] ?? 'N/A'}",
@@ -431,8 +436,32 @@ Future<void> openMapPicker(BuildContext context, TextEditingController venueCont
   }
 }
 
+// Upload image and return its server URL
+Future<String?> uploadEventImage(img_picker.XFile imageFile) async {
+  var request = http.MultipartRequest(
+    'POST',
+    Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event_image.php'),
+  );
+
+  request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+  var response = await request.send();
+  var resBody = await response.stream.bytesToString();
+  var data = jsonDecode(resBody);
+
+  if (data['success'] == true) {
+    return data['image_url'];
+  } else {
+    debugPrint('Image upload failed: ${data['error']}');
+    return null;
+  }
+}
 
 Future<void> showAddEventDialog(BuildContext context) async {
+  debugPrint('ImagePicker initialized: ${img_picker.ImagePicker().toString()}');
+  img_picker.XFile? pickedImage;
+  String? uploadedImageUrl;
+  final img_picker.ImagePicker picker = img_picker.ImagePicker();
   String? selectedCategory;
   String? selectedStatus;
   final TextEditingController titleController = TextEditingController();
@@ -448,8 +477,8 @@ Future<void> showAddEventDialog(BuildContext context) async {
     context: context,
     barrierDismissible: false,
     builder: (BuildContext context) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
+      return StatefulBuilder(
+        builder: (BuildContext context, StateSetter setModalState) {
           return Dialog(
             backgroundColor: const Color(0xFFFFF6F6),
             insetPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -505,14 +534,26 @@ Future<void> showAddEventDialog(BuildContext context) async {
                         height: 180,
                         color: Colors.grey[200],
                         alignment: Alignment.center,
-                        child: const Text("Image Preview Here"),
+                        child: pickedImage != null
+                          ? Image.file(File(pickedImage!.path), fit: BoxFit.cover)
+                          : const Text("Image Preview Here"),
                       ),
                       const SizedBox(height: 1),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end, // Align buttons to the right
                         children: [
                           ElevatedButton(
-                            onPressed: () {},
+                            onPressed: () async {
+                              final img_picker.XFile? image = await picker.pickImage(source: img_picker.ImageSource.gallery);
+                              if (image != null) {
+                                setModalState(() {
+                                  pickedImage = image;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Image selected. It will be uploaded when you add the event.")),
+                                );
+                              }
+                            },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size(100, 20),
                               backgroundColor: const Color(0xFF4DB1E3), // Upload blue
@@ -601,15 +642,15 @@ Future<void> showAddEventDialog(BuildContext context) async {
                                   controller: dateController,
                                   readOnly: true,
                                   onTap: () async {
+                                    final DateTime now = DateTime.now();
                                     final DateTime? picked = await showDatePicker(
                                       context: context,
-                                      initialDate: DateTime.now(),
-                                      firstDate: DateTime(2000),
+                                      initialDate: now,
+                                      firstDate: now, // 👈 Disables past dates
                                       lastDate: DateTime(2100),
                                     );
                                     if (picked != null) {
                                       dateController.text = "${picked.month}/${picked.day}/${picked.year}";
-                                      // Optional: auto-fill Day field
                                       dayController.text = getDayOfWeek(picked.weekday);
                                     }
                                   },
@@ -671,6 +712,24 @@ Future<void> showAddEventDialog(BuildContext context) async {
                             initialTime: TimeOfDay.now(),
                           );
                           if (picked != null) {
+                            // Combine picked time with selected date
+                            final selectedDate = DateFormat("MM/dd/yyyy").parse(dateController.text);
+                            final pickedDateTime = DateTime(
+                              selectedDate.year,
+                              selectedDate.month,
+                              selectedDate.day,
+                              picked.hour,
+                              picked.minute,
+                            );
+
+                            final now = DateTime.now();
+                            if (pickedDateTime.isBefore(now)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Time cannot be in the past.")),
+                              );
+                              return;
+                            }
+
                             timeController.text = picked.format(context);
                           }
                         },
@@ -701,7 +760,7 @@ Future<void> showAddEventDialog(BuildContext context) async {
                         isDense: true,
                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                        items: ['Active', 'Upcoming', 'Completed']
+                        items: ['Ongoing', 'Upcoming', 'Completed']
                             .map((stat) => DropdownMenuItem(value: stat, child: Text(stat)))
                             .toList(),
                         onChanged: (val) => selectedStatus = val,
@@ -739,8 +798,53 @@ Future<void> showAddEventDialog(BuildContext context) async {
                         mainAxisAlignment: MainAxisAlignment.end, // 👈 move to right
                         children: [
                           ElevatedButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
+                            onPressed: () async {
+                              if (titleController.text.isEmpty || pickedImage == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Title and image are required")),
+                                );
+                                return;
+                              }
+
+                              // 🔁 Upload the image here
+                              final uploadedUrl = await uploadEventImage(pickedImage!);
+                              if (uploadedUrl == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Image upload failed. Try again.")),
+                                );
+                                return;
+                              }
+
+                              final Map<String, dynamic> newEvent = {
+                                "title": titleController.text,
+                                "category": selectedCategory ?? "Uncategorized",
+                                "event_date": dateController.text,
+                                "event_start_time": timeController.text,
+                                "event_end_time": timeController.text,
+                                "event_venue": venueController.text,
+                                "event_status": selectedStatus ?? "UPCOMING",
+                                "event_speakers": speakerController.text,
+                                "content": contentController.text,
+                                "image_url": uploadedUrl,
+                              };
+
+                              final response = await http.post(
+                                Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event.php'),
+                                headers: {'Content-Type': 'application/json'},
+                                body: jsonEncode(newEvent),
+                              );
+
+                              final result = jsonDecode(response.body);
+                              if (result['success']) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Event added successfully")),
+                                );
+                                Navigator.of(context).pop(); // Close modal
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text("Error: ${result['error']}")),
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size(150, 20),
