@@ -282,25 +282,35 @@ class EventsPage extends StatelessWidget {
                                   return AlertDialog(
                                     backgroundColor: const Color(0xFFFFF6F6),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                     contentPadding: const EdgeInsets.all(24),
                                     content: SingleChildScrollView(
                                       child: Column(
+                                        mainAxisSize: MainAxisSize.min,
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.close, color: Colors.black54),
+                                                onPressed: () => Navigator.of(context).pop(),
+                                              ),
+                                            ],
+                                          ),
                                           if (event['image_url'] != null && event['image_url'].toString().isNotEmpty)
-                                                SizedBox(
-                                                height: 180,
-                                                width: double.infinity,
-                                                child: ClipRRect(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  child: Image.network(
-                                                    'http://10.0.2.2${event['image_url']}',
-                                                    fit: BoxFit.cover,
-                                                  ),
+                                            SizedBox(
+                                              height: 180,
+                                              width: double.infinity,
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(12),
+                                                child: Image.network(
+                                                  'http://10.0.2.2${event['image_url']}',
+                                                  fit: BoxFit.cover,
                                                 ),
                                               ),
+                                            ),
                                           const SizedBox(height: 16),
                                           Text(
                                             "Title: ${event['title'] ?? 'N/A'}",
@@ -320,12 +330,6 @@ class EventsPage extends StatelessWidget {
                                         ],
                                       ),
                                     ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.of(context).pop(),
-                                        child: const Text("Close"),
-                                      ),
-                                    ],
                                   );
                                 },
                               );
@@ -471,6 +475,7 @@ Future<void> showAddEventDialog(BuildContext context) async {
   final TextEditingController dateController = TextEditingController();
   final TextEditingController dayController = TextEditingController();
   final TextEditingController timeController = TextEditingController();
+  final TextEditingController timeControllerEnd = TextEditingController();
 
 
   await showDialog(
@@ -699,54 +704,127 @@ Future<void> showAddEventDialog(BuildContext context) async {
                       ),
 
                       const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          // Start Time
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Time Start', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: timeController, // reuse or rename to startTimeController
+                                  readOnly: true,
+                                  onTap: () async {
+                                    final TimeOfDay? picked = await showTimePicker(
+                                      context: context,
+                                      initialTime: TimeOfDay.now(),
+                                    );
+                                    if (picked != null) {
+                                      final selectedDate = DateFormat("MM/dd/yyyy").parse(dateController.text);
+                                      final pickedDateTime = DateTime(
+                                        selectedDate.year,
+                                        selectedDate.month,
+                                        selectedDate.day,
+                                        picked.hour,
+                                        picked.minute,
+                                      );
 
-                      // Time
-                      const Text('Time', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: timeController,
-                        readOnly: true,
-                        onTap: () async {
-                          final TimeOfDay? picked = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.now(),
-                          );
-                          if (picked != null) {
-                            // Combine picked time with selected date
-                            final selectedDate = DateFormat("MM/dd/yyyy").parse(dateController.text);
-                            final pickedDateTime = DateTime(
-                              selectedDate.year,
-                              selectedDate.month,
-                              selectedDate.day,
-                              picked.hour,
-                              picked.minute,
-                            );
+                                      if (pickedDateTime.isBefore(DateTime.now())) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text("Start time cannot be in the past.")),
+                                        );
+                                        return;
+                                      }
 
-                            final now = DateTime.now();
-                            if (pickedDateTime.isBefore(now)) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Time cannot be in the past.")),
-                              );
-                              return;
-                            }
-
-                            timeController.text = picked.format(context);
-                          }
-                        },
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          suffixIcon: const Icon(Icons.access_time, size: 15, color: Colors.grey),
-                          suffixIconConstraints: const BoxConstraints(
-                            minHeight: 24,
-                            minWidth: 24,
-                            maxHeight: 24,
-                            maxWidth: 24,
+                                      setModalState(() {
+                                        timeController.text = picked.format(context);
+                                      });
+                                    }
+                                  },
+                                  decoration: const InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    suffixIcon: Icon(Icons.access_time, size: 15, color: Colors.grey),
+                                    suffixIconConstraints: BoxConstraints(minHeight: 24, minWidth: 24),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          // End Time
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Time End', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: timeControllerEnd, // create this controller above
+                                  readOnly: true,
+                                  onTap: () async {
+                                    final TimeOfDay? picked = await showTimePicker(
+                                      context: context,
+                                      initialTime: TimeOfDay.now(),
+                                    );
+                                    if (picked != null) {
+                                      try {
+                                        final selectedDate = DateFormat("MM/dd/yyyy").parse(dateController.text);
+                                        final startTime = TimeOfDay.fromDateTime(
+                                          DateFormat.jm().parse(timeController.text),
+                                        );
+
+                                        final pickedStart = DateTime(
+                                          selectedDate.year,
+                                          selectedDate.month,
+                                          selectedDate.day,
+                                          startTime.hour,
+                                          startTime.minute,
+                                        );
+                                        final pickedEnd = DateTime(
+                                          selectedDate.year,
+                                          selectedDate.month,
+                                          selectedDate.day,
+                                          picked.hour,
+                                          picked.minute,
+                                        );
+
+                                        if (pickedEnd.isBefore(pickedStart)) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text("End time cannot be before start time.")),
+                                          );
+                                          return;
+                                        }
+
+                                        setModalState(() {
+                                          timeControllerEnd.text = picked.format(context);
+                                        });
+                                      } catch (_) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text("Please select the start time first.")),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  decoration: const InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    suffixIcon: Icon(Icons.access_time, size: 15, color: Colors.grey),
+                                    suffixIconConstraints: BoxConstraints(minHeight: 24, minWidth: 24),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       const Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -820,7 +898,7 @@ Future<void> showAddEventDialog(BuildContext context) async {
                                 "category": selectedCategory ?? "Uncategorized",
                                 "event_date": dateController.text,
                                 "event_start_time": timeController.text,
-                                "event_end_time": timeController.text,
+                                "event_end_time": timeControllerEnd.text,
                                 "event_venue": venueController.text,
                                 "event_status": selectedStatus ?? "UPCOMING",
                                 "event_speakers": speakerController.text,
