@@ -36,13 +36,68 @@ String formatDate(String rawDate) {
   }
 }
 
-class EventsPage extends StatelessWidget {
+class EventsPage extends StatefulWidget {
   const EventsPage({super.key});
+
+  @override
+  State<EventsPage> createState() => _EventsPageState();
+}
+
+class _EventsPageState extends State<EventsPage> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _allEvents = [];
+  List<Map<String, dynamic>> _filteredEvents = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+void _onSearchChanged() {
+  setState(() {
+    _searchQuery = _searchController.text.toLowerCase();
+
+    _filteredEvents = _allEvents.where((event) {
+      final title = event['title']?.toLowerCase() ?? '';
+      final category = event['category']?.toLowerCase() ?? '';
+      final status = event['event_status']?.toLowerCase() ?? '';
+      final rawDate = event['event_date'] ?? '';
+      final formattedDate = formatDate(rawDate).toLowerCase(); // e.g., "May 3, 2025"
+
+      return title.contains(_searchQuery) ||
+          category.contains(_searchQuery) ||
+          status.contains(_searchQuery) ||
+          formattedDate.contains(_searchQuery);
+    }).toList();
+  });
+}
+
+  Future<void> _loadEvents() async {
+    try {
+      final events = await fetchEvents();
+      setState(() {
+        _allEvents = events;
+        _filteredEvents = events;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error loading events: $e")));
+    }
+  }
 
   void _navigateTo(BuildContext context, Widget page) {
     Navigator.pop(context);
     Navigator.push(context, MaterialPageRoute(builder: (context) => page));
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +118,8 @@ class EventsPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(40),
                 ),
                 height: 45,
-                child: const TextField(
+                child:  TextField(
+                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Search',
                     hintStyle: TextStyle(color: Colors.grey),
@@ -235,27 +291,31 @@ class EventsPage extends StatelessWidget {
             ),
             const SizedBox(height: 30),
             Expanded(
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: fetchEvents(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No events found.'));
-                  }
+             child: _isLoading
+      ? const Center(child: CircularProgressIndicator())
+      : _filteredEvents.isEmpty
+          ? const Center(child: Text('No events found.'))
+          : _buildEventTable(context, _filteredEvents),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-                  final events = snapshot.data!;
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    padding: const EdgeInsets.all(10),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
+
+Widget _buildEventTable(BuildContext context, List<Map<String, dynamic>> events) {
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    padding: const EdgeInsets.all(10),
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+        // your DataTable columns + rows go here
+                              child: DataTable(
                         columnSpacing: 10,
                         headingRowHeight: 56,
                         dataRowHeight: 60,
@@ -277,7 +337,7 @@ class EventsPage extends StatelessWidget {
                           return DataRow(
                             onSelectChanged: (_) {
                               showDialog(
-                                context: context,
+                                context: context, 
                                 builder: (context) {
                                   return AlertDialog(
                                     backgroundColor: const Color(0xFFFFF6F6),
@@ -405,15 +465,9 @@ class EventsPage extends StatelessWidget {
                       ),
                     ),
                   );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
+
+
 
 Widget _pillButton({required Widget child}) {
   return Container(
@@ -732,7 +786,7 @@ Future<void> showEventDialog(
                       const SizedBox(height: 12),
 
                       // Only for "Add" mode: Date, Day, Start & End time
-                      if (!isEdit) ...[
+                   
                         Row(
                           children: [
                             Expanded(
@@ -915,7 +969,7 @@ Future<void> showEventDialog(
                           ],
                         ),
                         const SizedBox(height: 12),
-                      ],
+                      
 
                       // Status (with limited choices when editing)
                       const Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
