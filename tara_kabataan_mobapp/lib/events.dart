@@ -57,24 +57,17 @@ class _EventsPageState extends State<EventsPage> {
     _searchController.addListener(_onSearchChanged);
   }
 
-void _onSearchChanged() {
-  setState(() {
-    _searchQuery = _searchController.text.toLowerCase();
-
-    _filteredEvents = _allEvents.where((event) {
-      final title = event['title']?.toLowerCase() ?? '';
-      final category = event['category']?.toLowerCase() ?? '';
-      final status = event['event_status']?.toLowerCase() ?? '';
-      final rawDate = event['event_date'] ?? '';
-      final formattedDate = formatDate(rawDate).toLowerCase(); // e.g., "May 3, 2025"
-
-      return title.contains(_searchQuery) ||
-          category.contains(_searchQuery) ||
-          status.contains(_searchQuery) ||
-          formattedDate.contains(_searchQuery);
-    }).toList();
-  });
-}
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase();
+      _filteredEvents = _allEvents
+          .where((event) =>
+              event['title']?.toLowerCase().contains(_searchQuery) == true ||
+              event['category']?.toLowerCase().contains(_searchQuery) == true ||
+              event['event_status']?.toLowerCase().contains(_searchQuery) == true)
+          .toList();
+    });
+  }
 
   Future<void> _loadEvents() async {
     try {
@@ -292,11 +285,23 @@ void _onSearchChanged() {
             const SizedBox(height: 30),
             Expanded(
              child: _isLoading
-      ? const Center(child: CircularProgressIndicator())
-      : _filteredEvents.isEmpty
-          ? const Center(child: Text('No events found.'))
-          : _buildEventTable(context, _filteredEvents),
-            ),
+ ? const Center(child: CircularProgressIndicator())
+      : RefreshIndicator(
+          onRefresh: _loadEvents,
+          child: _filteredEvents.isEmpty
+              ?  ListView(
+                  children: [Center(child: Padding(
+                    padding: EdgeInsets.only(top: 100),
+                    child: Text('No events found.'),
+                  ))],
+                )
+              : ListView(
+                  children: [
+                    _buildEventTable(context, _filteredEvents),
+                  ],
+                ),
+        ),
+),
           ],
         ),
       ),
