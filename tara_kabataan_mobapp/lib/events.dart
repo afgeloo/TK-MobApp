@@ -9,7 +9,7 @@
 	import 'package:google_maps_flutter/google_maps_flutter.dart';
 	import 'dart:io';
 	import 'package:image_picker/image_picker.dart' as img_picker;
-
+	import 'package:html_editor_enhanced/html_editor.dart';
 
 
 	// Fetch Events Data
@@ -318,9 +318,9 @@
 																				),
 																			),
 																		const SizedBox(height: 16),
-																		Text(
-																			"Title: ${event['title'] ?? 'N/A'}",
-																			style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+																		HtmlWidget(
+																		event['title'] ?? '',
+																		textStyle: const TextStyle(fontSize: 16),
 																		),
 																		const SizedBox(height: 8),
 																		Text("Category: ${event['category'] ?? 'N/A'}"),
@@ -329,9 +329,9 @@
 																		const SizedBox(height: 8),
 																		const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
 																		const SizedBox(height: 4),
-																		HtmlWidget(
-																			event['content'] ?? 'No content.',
-																			baseUrl: Uri.parse('http://10.0.2.2/tara-kabataan/'),
+															HtmlWidget(
+																		(event['content'] ?? 'No content.').replaceAll('http://localhost', 'http://10.0.2.2'),
+																		baseUrl: Uri.parse('http://10.0.2.2'),
 																		),
 																		const SizedBox(height: 20),
 																		Row(
@@ -742,171 +742,6 @@ if (events.isNotEmpty)
 		}
 	}
 
-
-	// Widget _buildEventTable(BuildContext context, List<Map<String, dynamic>> events) {
-	//   return Container(
-	//     decoration: BoxDecoration(
-	//       color: Colors.white,
-	//       borderRadius: BorderRadius.circular(16),
-	//     ),
-	//     padding: const EdgeInsets.all(10),
-	//     child: SingleChildScrollView(
-	//       scrollDirection: Axis.horizontal,
-	//         // your DataTable columns + rows go here
-	//                               child: DataTable(
-	//                         columnSpacing: 10,
-	//                         headingRowHeight: 56,
-	//                         dataRowHeight: 60,
-	//                         dividerThickness: 0,
-	//                         showCheckboxColumn: false,
-	//                         headingRowColor: WidgetStateProperty.all(Colors.transparent),
-	//                         border: TableBorder(
-	//                           horizontalInside: BorderSide.none,
-	//                           top: BorderSide.none,
-	//                           bottom: BorderSide.none,
-	//                         ),
-	//                         columns: const [
-	//                           DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-	//                           DataColumn(label: Text('Title', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-	//                           DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-	//                           DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-	//                         ],
-	//                         rows: events.map((event) {
-	//                           return DataRow(
-	//                             onSelectChanged: (_) {
-	//                               showDialog(
-	//                                 context: context, 
-	//                                 builder: (context) {
-	//                                   return AlertDialog(
-	//                                     backgroundColor: const Color(0xFFFFF6F6),
-	//                                     shape: RoundedRectangleBorder(
-	//                                       borderRadius: BorderRadius.circular(10),
-	//                                     ),
-	//                                     contentPadding: const EdgeInsets.all(24),
-	//                                     content: SingleChildScrollView(
-	//                                       child: Column(
-	//                                         mainAxisSize: MainAxisSize.min,
-	//                                         crossAxisAlignment: CrossAxisAlignment.start,
-	//                                         children: [
-	//                                           Row(
-	//                                             mainAxisAlignment: MainAxisAlignment.end,
-	//                                             children: [
-	//                                               IconButton(
-	//                                                 icon: const Icon(Icons.close, color: Colors.black54),
-	//                                                 onPressed: () => Navigator.of(context).pop(),
-	//                                               ),
-	//                                             ],
-	//                                           ),
-	//                                           if (event['image_url'] != null && event['image_url'].toString().isNotEmpty)
-	//                                             SizedBox(
-	//                                               height: 180,
-	//                                               width: double.infinity,
-	//                                               child: ClipRRect(
-	//                                                 borderRadius: BorderRadius.circular(12),
-	//                                                 child: Image.network(
-	//                                                   'http://10.0.2.2${event['image_url']}',
-	//                                                   fit: BoxFit.cover,
-	//                                                 ),
-	//                                               ),
-	//                                             ),
-	//                                           const SizedBox(height: 16),
-	//                                           Text(
-	//                                             "Title: ${event['title'] ?? 'N/A'}",
-	//                                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-	//                                           ),
-	//                                           const SizedBox(height: 8),
-	//                                           Text("Category: ${event['category'] ?? 'N/A'}"),
-	//                                           Text("Status: ${event['event_status'] ?? 'N/A'}"),
-	//                                           Text("Date: ${formatDate(event['event_date'] ?? '')}"),
-	//                                           const SizedBox(height: 8),
-	//                                           const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
-	//                                           const SizedBox(height: 4),
-	//                                           HtmlWidget(
-	//                                             event['content'] ?? 'No content.',
-	//                                             baseUrl: Uri.parse('http://10.0.2.2/tara-kabataan/'),
-	//                                           ),
-	//                                           const SizedBox(height: 20),
-	//                                           Row(
-	//                                             children: [
-	//                                               Spacer(), // pushes buttons to the right
-	//                                               ElevatedButton.icon(
-	//                                                 onPressed: () async {
-	//                                                   final confirm = await showDialog<bool>(
-	//                                                     context: context,
-	//                                                     builder: (context) => AlertDialog(
-	//                                                       title: const Text("Delete Event"),
-	//                                                       content: const Text("Are you sure you want to delete this event?"),
-	//                                                       actions: [
-	//                                                         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-	//                                                         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
-	//                                                       ],
-	//                                                     ),
-	//                                                   );
-
-	//                                                   if (confirm == true) {
-	//                                                     final deleteResponse = await http.post(
-	//                                                       Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_event.php'),
-	//                                                       headers: {'Content-Type': 'application/json'},
-	//                                                       body: jsonEncode({"event_id": event['event_id']}),
-	//                                                     );
-
-	//                                                     final deleteResult = jsonDecode(deleteResponse.body);
-	//                                                     if (deleteResult['success']) {
-	//                                                       Navigator.of(context).pop(); // Close the modal
-	//                                                       ScaffoldMessenger.of(context).showSnackBar(
-	//                                                         const SnackBar(content: Text("Event deleted successfully.")),
-	//                                                       );
-	//                                                     } else {
-	//                                                       ScaffoldMessenger.of(context).showSnackBar(
-	//                                                         SnackBar(content: Text("Failed to delete: ${deleteResult['error']}")),
-	//                                                       );
-	//                                                     }
-	//                                                   }
-	//                                                 },
-	//                                                 style: ElevatedButton.styleFrom(
-	//                                                   backgroundColor: const Color(0xFFE94B4B), // red
-	//                                                   foregroundColor: Colors.white,
-	//                                                 ),
-	//                                                 icon: const Icon(Icons.delete),
-	//                                                 label: const Text("Delete"),
-	//                                               ),
-	//                                               const SizedBox(width: 10),
-	//                                               ElevatedButton.icon(
-	//                                                 onPressed: () {
-	//                                                   Navigator.of(context).pop(); // Close the current view modal
-	//                                                   showEventDialog(context, isEdit: true, eventData: event);
-	//                                                 },
-	//                                                 style: ElevatedButton.styleFrom(
-	//                                                   backgroundColor: const Color(0xFF4DB1E3), // blue
-	//                                                   foregroundColor: Colors.white,
-	//                                                 ),
-	//                                                 icon: const Icon(Icons.edit),
-	//                                                 label: const Text("Edit"),
-	//                                               ),
-	//                                             ],
-	//                                           ),
-	//                                         ],
-	//                                       ),
-	//                                     ),
-	//                                   );
-	//                                 },
-	//                               );
-	//                             },
-	//                             cells: [
-	//                               DataCell(SizedBox(width: 60, child: Text(event['category'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Color(0xFFFF5A89))))),
-	//                               DataCell(SizedBox(width: 80, child: Text(event['title'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
-	//                               DataCell(SizedBox(width: 60, child: Text(event['event_status'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
-	//                               DataCell(SizedBox(width: 60, child: Text(formatDate(event['event_date'] ?? ''), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
-	//                             ],
-	//                           );
-	//                         }).toList(),
-	//                       ),
-	//                     ),
-	//                   );
-	// }
-
-
-
 	Widget _pillButton({required Widget child}) {
 		return Container(
 			padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1053,6 +888,8 @@ if (events.isNotEmpty)
 			builder: (BuildContext context) {
 				return StatefulBuilder(
 					builder: (context, setModalState) {
+						 final htmlEditorController = HtmlEditorController();
+
 						return Dialog(
 							backgroundColor: const Color(0xFFFFF6F6),
 							insetPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1183,7 +1020,7 @@ if (events.isNotEmpty)
 														isDense: true,
 														contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
 													),
-													items: ['KALUSUGAN', 'KALIKASAN', 'KARUNUNGAN', 'KULTURA', 'KASARIAN']
+													items: ['Uncategorized', 'KALUSUGAN', 'KALIKASAN', 'KARUNUNGAN', 'KULTURA', 'KASARIAN']
 															.map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
 															.toList(),
 													onChanged: (val) => selectedCategory = val,
@@ -1421,7 +1258,7 @@ if (events.isNotEmpty)
 															isDense: true,
 															contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
 														),
-														items: ['UPCOMING', 'CANCELLED']
+														items: ['UPCOMING', 'CANCELLED', 'COMPLETED', 'ONGOING']
 																.map((stat) => DropdownMenuItem(value: stat, child: Text(stat)))
 																.toList(),
 														onChanged: (val) => selectedStatus = val,
@@ -1456,20 +1293,71 @@ if (events.isNotEmpty)
 												const SizedBox(height: 12),
 
 												// Content
-												const Text('Content', style: TextStyle(fontWeight: FontWeight.bold)),
-												const SizedBox(height: 6),
-												TextField(
-													controller: contentController,
-													maxLines: 5,
-													decoration: const InputDecoration(
-														filled: true,
-														fillColor: Colors.white,
-														border: InputBorder.none,
-														isDense: true,
-														contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-													),
-												),
-												const SizedBox(height: 20),
+											const Text('Content', style: TextStyle(fontWeight: FontWeight.bold)),
+const SizedBox(height: 6),
+
+// Create a controller for the HTML Editor
+// HTML Editor component
+Container(
+  height: 300,  // Adjust height as needed
+  decoration: BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(8),
+  ),
+  child: HtmlEditor(
+    controller: htmlEditorController,
+    htmlEditorOptions: HtmlEditorOptions(
+      hint: 'Enter your content here...',
+      initialText: contentController.text,
+    ),
+htmlToolbarOptions: HtmlToolbarOptions(
+  toolbarPosition: ToolbarPosition.aboveEditor,
+  toolbarType: ToolbarType.nativeScrollable,
+  defaultToolbarButtons: [
+  const  StyleButtons(), // Bold, italic, underline buttons
+   const FontButtons(), // Font formatting without parameters
+   const ListButtons(), // Bullet and numbered lists
+   const InsertButtons(picture: true), // Just enable the image upload
+  ],
+  // Add this mediaUploadInterceptor
+  mediaUploadInterceptor: (file, insertFileType) async {
+    // Upload the file to your server
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event_image.php'),
+    );
+    
+    request.files.add(await http.MultipartFile.fromPath('image', file.path!));
+    
+    var response = await request.send();
+    var resBody = await response.stream.bytesToString();
+    var data = jsonDecode(resBody);
+    
+    if (data['success'] == true) {
+      // Insert image URL instead of base64
+      String imageUrl = 'http://10.0.2.2${data['image_url']}';
+      htmlEditorController.insertNetworkImage(imageUrl);
+      return false; // Don't process the default way
+    }
+    
+    return true; // Fall back to default behavior if upload fails
+  },
+),
+    callbacks: Callbacks(
+      onInit: () {
+        if (isEdit && eventData != null && eventData['content'] != null) {
+          htmlEditorController.setText(eventData['content']);
+        }
+      },
+      onChangeContent: (String? changed) {
+        if (changed != null) {
+          contentController.text = changed;
+        }
+      },
+    ),
+  ),
+),
+const SizedBox(height: 20),
 
 												// Submit button
 												Row(
@@ -1477,6 +1365,9 @@ if (events.isNotEmpty)
 													children: [
 														ElevatedButton(
 															onPressed: () async {
+																//   final htmlContent = await htmlEditorController.getText();
+																// contentController.text = htmlContent;	
+
 																// Basic validation
 																if (titleController.text.isEmpty ||
 																		(!isEdit && pickedImage == null && uploadedImageUrl == null)) {
@@ -1486,6 +1377,8 @@ if (events.isNotEmpty)
 																	);
 																	return;
 																}
+																
+															
 
 																// If a new image was picked, upload it
 																if (pickedImage != null) {
