@@ -417,94 +417,109 @@
 							}).toList(),
 						),
 					),
-					 if (events.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // ADDED: Previous page button
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_ios, size: 16),
-                        onPressed: _currentPage > 1
-                            ? () {
-                                setState(() {
-                                  _currentPage--;  // Go to previous page
-                                });
-                              }
-                            : null,  // Disabled if on first page
-                        color: _currentPage > 1 ? const Color(0xFFFF5A89) : Colors.grey,
-                      ),
-                      const SizedBox(width: 8),
-                      
-                      // ADDED: Page number buttons with ellipses for larger page counts
-                      for (int i = 1; i <= _totalPages; i++)
-                        // Show page numbers: first, last, and those around current page
-                        if (_totalPages <= 5 || 
-                            i == 1 || 
-                            i == _totalPages || 
-                            (i >= _currentPage - 1 && i <= _currentPage + 1))
-                          Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            child: ElevatedButton(
-                              onPressed: i != _currentPage
-                                  ? () {
-                                      setState(() {
-                                        _currentPage = i;  // Jump to specific page
-                                      });
-                                    }
-                                  : null,  // Disabled for current page
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: i == _currentPage
-                                    ? const Color(0xFFFF5A89)
-                                    : Colors.white,
-                                foregroundColor: i == _currentPage
-                                    ? Colors.white
-                                    : const Color(0xFF3D3D3D),
-                                minimumSize: const Size(40, 40),
-                                padding: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: Text('$i'),
-                            ),
-                          )
-                        // Show ellipses for large page gaps
-                        else if ((i == 2 && _currentPage > 3) || 
-                                 (i == _totalPages - 1 && _currentPage < _totalPages - 2))
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Text('...', style: TextStyle(fontSize: 16)),
-                          ),
-                      const SizedBox(width: 8),
-                      
-                      // ADDED: Next page button
-                      IconButton(
-                        icon: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onPressed: _currentPage < _totalPages
-                            ? () {
-                                setState(() {
-                                  _currentPage++;  // Go to next page
-                                });
-                              }
-                            : null,  // Disabled if on last page
-                        color: _currentPage < _totalPages ? const Color(0xFFFF5A89) : Colors.grey,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // ADDED: Text showing current range and total items
-                  Text(
-                    'Showing ${events.isEmpty ? 0 : startIndex + 1} to $endIndex of ${events.length} entries',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ),
+					// Pagination controls UI
+// ADDED: Pagination controls UI with the design you requested
+if (events.isNotEmpty)
+  Padding(
+    padding: const EdgeInsets.only(top: 16),
+    child: Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Previous page button
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16),
+              onPressed: _currentPage > 1
+                  ? () {
+                      setState(() {
+                        _currentPage--;
+                      });
+                    }
+                  : null,
+              color: _currentPage > 1 ? const Color(0xFFFF5A89) : Colors.grey,
             ),
+            const SizedBox(width: 8),
+            
+            // Page number indicators with custom styling
+            for (int i = 1; i <= _totalPages; i++)
+              if (_totalPages <= 5 || 
+                  i == 1 || 
+                  i == _totalPages || 
+                  (i >= _currentPage - 1 && i <= _currentPage + 1))
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  // MODIFIED: Use different widgets based on whether page is selected
+                  child: i == _currentPage
+                    // Selected page: Circle with pink background
+                    ? Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF5A89),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$i',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      )
+                    // Unselected page: Just the number with onTap
+                    : InkWell(
+                        onTap: () {
+                          setState(() {
+                            _currentPage = i;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            '$i',
+                            style: const TextStyle(
+                              color: Color(0xFF3D3D3D),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                )
+              else if ((i == 2 && _currentPage > 3) || 
+                       (i == _totalPages - 1 && _currentPage < _totalPages - 2))
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text('...', style: TextStyle(fontSize: 16)),
+                ),
+            const SizedBox(width: 8),
+            
+            // Next page button
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios, size: 16),
+              onPressed: _currentPage < _totalPages
+                  ? () {
+                      setState(() {
+                        _currentPage++;
+                      });
+                    }
+                  : null,
+              color: _currentPage < _totalPages ? const Color(0xFFFF5A89) : Colors.grey,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        
+        // Page info text
+        Text(
+          'Showing ${events.isEmpty ? 0 : startIndex + 1} to $endIndex of ${events.length} entries',
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+      ],
+    ),
+  ),
 				],
 			),
 		);
