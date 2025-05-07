@@ -50,8 +50,11 @@
 		List<Map<String, dynamic>> _filteredEvents = [];
 		bool _isLoading = true;
 		String _searchQuery = '';
-			bool _isSelecting = false;
+		bool _isSelecting = false;
 		Set<String> _selectedEventIds = {};
+		int _currentPage = 1;
+		int _itemsPerPage = 10;
+		int _totalPages = 1;
 
 		@override
 		void initState() {
@@ -69,6 +72,7 @@
 								event['category']?.toLowerCase().contains(_searchQuery) == true ||
 								event['event_status']?.toLowerCase().contains(_searchQuery) == true)
 						.toList();
+						_currentPage = 1;
 			});
 		}
 
@@ -79,6 +83,7 @@
 					_allEvents = events;
 					_filteredEvents = events;
 					_isLoading = false;
+					_currentPage = 1;
 				});
 			} catch (e) {
 				setState(() {
@@ -164,6 +169,13 @@
 		}
 
 	Widget _buildEventTable(List<Map<String, dynamic>> events) {
+	_totalPages = (events.length / _itemsPerPage).ceil();
+    int startIndex = (_currentPage - 1) * _itemsPerPage;
+    int endIndex = startIndex + _itemsPerPage;
+    if (endIndex > events.length) endIndex = events.length;
+
+	    final paginatedEvents = events.isEmpty ? [] : events.sublist(startIndex, endIndex);
+
 		return Container(
 			decoration: BoxDecoration(
 				color: Colors.white,
@@ -230,7 +242,7 @@
 								const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
 								const DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
 							],
-							rows: events.map((event) {
+							rows: paginatedEvents.map((event) {
 								return DataRow(
 									selected: _isSelecting && _selectedEventIds.contains(event['event_id']),
 									onSelectChanged: _isSelecting 
@@ -405,6 +417,94 @@
 							}).toList(),
 						),
 					),
+					 if (events.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // ADDED: Previous page button
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios, size: 16),
+                        onPressed: _currentPage > 1
+                            ? () {
+                                setState(() {
+                                  _currentPage--;  // Go to previous page
+                                });
+                              }
+                            : null,  // Disabled if on first page
+                        color: _currentPage > 1 ? const Color(0xFFFF5A89) : Colors.grey,
+                      ),
+                      const SizedBox(width: 8),
+                      
+                      // ADDED: Page number buttons with ellipses for larger page counts
+                      for (int i = 1; i <= _totalPages; i++)
+                        // Show page numbers: first, last, and those around current page
+                        if (_totalPages <= 5 || 
+                            i == 1 || 
+                            i == _totalPages || 
+                            (i >= _currentPage - 1 && i <= _currentPage + 1))
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            child: ElevatedButton(
+                              onPressed: i != _currentPage
+                                  ? () {
+                                      setState(() {
+                                        _currentPage = i;  // Jump to specific page
+                                      });
+                                    }
+                                  : null,  // Disabled for current page
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: i == _currentPage
+                                    ? const Color(0xFFFF5A89)
+                                    : Colors.white,
+                                foregroundColor: i == _currentPage
+                                    ? Colors.white
+                                    : const Color(0xFF3D3D3D),
+                                minimumSize: const Size(40, 40),
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text('$i'),
+                            ),
+                          )
+                        // Show ellipses for large page gaps
+                        else if ((i == 2 && _currentPage > 3) || 
+                                 (i == _totalPages - 1 && _currentPage < _totalPages - 2))
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text('...', style: TextStyle(fontSize: 16)),
+                          ),
+                      const SizedBox(width: 8),
+                      
+                      // ADDED: Next page button
+                      IconButton(
+                        icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onPressed: _currentPage < _totalPages
+                            ? () {
+                                setState(() {
+                                  _currentPage++;  // Go to next page
+                                });
+                              }
+                            : null,  // Disabled if on last page
+                        color: _currentPage < _totalPages ? const Color(0xFFFF5A89) : Colors.grey,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // ADDED: Text showing current range and total items
+                  Text(
+                    'Showing ${events.isEmpty ? 0 : startIndex + 1} to $endIndex of ${events.length} entries',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
 				],
 			),
 		);
