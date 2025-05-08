@@ -332,10 +332,27 @@
 																		const SizedBox(height: 8),
 																		const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
 																		const SizedBox(height: 4),
-															HtmlWidget(
+															Container(
+																	width: double.infinity,
+																	padding: const EdgeInsets.all(12),
+																	margin: const EdgeInsets.only(top: 8),
+																	decoration: BoxDecoration(
+																		color: Colors.white,
+																		borderRadius: BorderRadius.circular(8),
+																		boxShadow: [
+																		BoxShadow(
+																			color: Colors.black12,
+																			blurRadius: 4,
+																			offset: Offset(0, 2),
+																		),
+																		],
+																	),
+																	child: HtmlWidget(
 																		(event['content'] ?? 'No content.').replaceAll('http://localhost', 'http://10.0.2.2'),
 																		baseUrl: Uri.parse('http://10.0.2.2'),
-																		),
+																		textStyle: const TextStyle(fontSize: 14, color: Colors.black87),
+																	),
+																	),
 																		const SizedBox(height: 20),
 																		Row(
 																			children: [
@@ -405,7 +422,7 @@
 												);
 											},
 										),
-										DataCell(SizedBox(width: 60, child: Text(
+										DataCell(SizedBox(width: 70, child: Text(
 											event['event_status'] ?? 'Unknown',
 											overflow: TextOverflow.ellipsis,
 											style: const TextStyle(fontSize: 10)
@@ -1023,7 +1040,7 @@ if (events.isNotEmpty)
 														isDense: true,
 														contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
 													),
-													items: ['Uncategorized', 'KALUSUGAN', 'KALIKASAN', 'KARUNUNGAN', 'KULTURA', 'KASARIAN']
+													items: [ 'KALUSUGAN', 'KALIKASAN', 'KARUNUNGAN', 'KULTURA', 'KASARIAN']
 															.map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
 															.toList(),
 													onChanged: (val) => selectedCategory = val,
@@ -1377,7 +1394,7 @@ const SizedBox(height: 20),
 																final payload = <String, dynamic>{
 																	if (isEdit) 'event_id': eventData!['event_id'],
 																	'title': titleController.text,
-																	'category': selectedCategory ?? 'Uncategorized',
+																	'category': selectedCategory ?? 'KALUSUGAN',
 																	'event_venue': venueController.text,
 																	'event_status': isEdit ? (selectedStatus ?? 'UPCOMING') : 'UPCOMING',
 																	'event_speakers': speakerController.text,
