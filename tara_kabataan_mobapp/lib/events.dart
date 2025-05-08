@@ -329,9 +329,9 @@
 																		const SizedBox(height: 8),
 																		const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
 																		const SizedBox(height: 4),
-															HtmlWidget(
-																		(event['content'] ?? 'No content.').replaceAll('http://localhost', 'http://10.0.2.2'),
-																		baseUrl: Uri.parse('http://10.0.2.2'),
+																		HtmlWidget(
+																			event['content'] ?? 'No content.',
+																			baseUrl: Uri.parse('http://10.0.2.2'),
 																		),
 																		const SizedBox(height: 20),
 																		Row(
@@ -1310,39 +1310,16 @@ Container(
       hint: 'Enter your content here...',
       initialText: contentController.text,
     ),
-htmlToolbarOptions: HtmlToolbarOptions(
-  toolbarPosition: ToolbarPosition.aboveEditor,
-  toolbarType: ToolbarType.nativeScrollable,
-  defaultToolbarButtons: [
-  const  StyleButtons(), // Bold, italic, underline buttons
-   const FontButtons(), // Font formatting without parameters
-   const ListButtons(), // Bullet and numbered lists
-   const InsertButtons(picture: true), // Just enable the image upload
-  ],
-  // Add this mediaUploadInterceptor
-  mediaUploadInterceptor: (file, insertFileType) async {
-    // Upload the file to your server
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event_image.php'),
-    );
-    
-    request.files.add(await http.MultipartFile.fromPath('image', file.path!));
-    
-    var response = await request.send();
-    var resBody = await response.stream.bytesToString();
-    var data = jsonDecode(resBody);
-    
-    if (data['success'] == true) {
-      // Insert image URL instead of base64
-      String imageUrl = 'http://10.0.2.2${data['image_url']}';
-      htmlEditorController.insertNetworkImage(imageUrl);
-      return false; // Don't process the default way
-    }
-    
-    return true; // Fall back to default behavior if upload fails
-  },
-),
+    htmlToolbarOptions: HtmlToolbarOptions(
+      toolbarPosition: ToolbarPosition.aboveEditor,
+      toolbarType: ToolbarType.nativeScrollable,
+      defaultToolbarButtons: [
+        StyleButtons(), // Bold, italic, underline buttons
+        FontButtons(), // Font formatting without parameters
+        ListButtons(), // Bullet and numbered lists
+        InsertButtons(picture: true), // Just enable the image upload
+      ],
+    ),
     callbacks: Callbacks(
       onInit: () {
         if (isEdit && eventData != null && eventData['content'] != null) {
