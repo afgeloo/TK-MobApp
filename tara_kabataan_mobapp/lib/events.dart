@@ -362,11 +362,11 @@
                                           Wrap(
                                             runSpacing: 4,
                                             children: [
-                                              Text("📅 ${formatDate(event['event_date'] ?? '')}"),
-                                              Text("📍 ${event['event_venue'] ?? 'N/A'}"),
+                                              Text("📅 ${formatDate(event['event_date'] ?? '')}"),                                              
                                               Text("🕓 ${event['event_start_time']} – ${event['event_end_time']}"),
                                               Text("🎯 ${event['category']} | ${event['event_status']}"),
                                               Text("🗣️ ${event['event_speakers'] ?? 'N/A'}"),
+                                              Text("📍 ${event['event_venue'] ?? 'N/A'}"),
                                             ],
                                           ),
                                 
