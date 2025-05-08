@@ -11,6 +11,9 @@
 	import 'package:image_picker/image_picker.dart' as img_picker;
 	import 'package:html_editor_enhanced/html_editor.dart';
   import 'widgets/google_map.dart';
+import 'package:provider/provider.dart';
+import 'widgets/notification_service.dart';
+import 'widgets/notification_center.dart';
 
 
 	// Fetch Events Data
@@ -37,6 +40,16 @@
 			return rawDate;
 		}
 	}
+
+	String _formatTime(String? time) {
+  if (time == null || time.isEmpty) return '';
+  try {
+    final parsedTime = DateFormat("HH:mm").parse(time);
+    return DateFormat("h:mm a").format(parsedTime); // Example: 2:30 PM
+  } catch (_) {
+    return time; // Fallback to original if parsing fails
+  }
+}
 
 	class EventsPage extends StatefulWidget {
 		const EventsPage({super.key});
@@ -133,6 +146,7 @@
 							headers: {'Content-Type': 'application/json'},
 							body: jsonEncode({"event_id": eventId}),
 						);
+						
 
 						final deleteResult = jsonDecode(deleteResponse.body);
 						if (!deleteResult['success']) {
@@ -164,6 +178,12 @@
 				} else {
 					ScaffoldMessenger.of(context).showSnackBar(
 						const SnackBar(content: Text("Events deleted successfully")),
+					);
+
+					final notificationManager = Provider.of<NotificationManager>(context, listen: false);
+					notificationManager.addNotification(
+						"Events Deleted",
+						"Successfully deleted ${_selectedEventIds.length} events",
 					);
 				}
 			}
@@ -363,8 +383,8 @@
                                           Wrap(
                                             runSpacing: 4,
                                             children: [
-                                              Text("📅 ${formatDate(event['event_date'] ?? '')}"),                                              
-                                              Text("🕓 ${event['event_start_time']} – ${event['event_end_time']}"),
+                                              Text("📅 ${formatDate(event['event_date'] ?? '')} | "),                                              
+																							Text("🕓 ${_formatTime(event['event_start_time'])} – ${_formatTime(event['event_end_time'])}"),
                                               Text("🎯 ${event['category']} | ${event['event_status']}"),
                                               Text("🗣️ ${event['event_speakers'] ?? 'N/A'}"),
                                               Text("📍 ${event['event_venue'] ?? 'N/A'}"),
@@ -432,6 +452,11 @@
                                                       ScaffoldMessenger.of(context).showSnackBar(
                                                         const SnackBar(content: Text("Event deleted successfully.")),
                                                       );
+																											final notificationManager = Provider.of<NotificationManager>(context, listen: false);
+																										notificationManager.addNotification(
+																											"Event Deleted",
+																											"The event '${event['title']}' was deleted successfully",
+																										);
                                                       _loadEvents();
                                                     } else {
                                                       ScaffoldMessenger.of(context).showSnackBar(
@@ -585,7 +610,7 @@ if (events.isNotEmpty)
         
         // Page info text
         Text(
-          'Showing ${events.isEmpty ? 0 : startIndex + 1} to $endIndex of ${events.length} entries',
+          '${events.isEmpty ? 0 : startIndex + 1} - $endIndex of ${events.length} events',
           style: const TextStyle(color: Colors.grey, fontSize: 12),
         ),
       ],
@@ -596,62 +621,114 @@ if (events.isNotEmpty)
 		);
 	}
 
-		@override
-		Widget build(BuildContext context) {
-			return Scaffold(
-				backgroundColor: const Color(0xFFFFF6F6),
-				appBar: AppBar(
-					backgroundColor: Colors.white,
-					elevation: 0,
-					toolbarHeight: 70,
-					iconTheme: const IconThemeData(color: Color(0xFFFF5A89)),
-					title: Row(
-						children: [
-							Expanded(
-								child: Container(
-									padding: const EdgeInsets.symmetric(horizontal: 16),
-									decoration: BoxDecoration(
-										color: const Color(0xFFF6F6F6),
-										borderRadius: BorderRadius.circular(40),
-									),
-									height: 45,
-									child:  TextField(
-										controller: _searchController,
-										decoration: InputDecoration(
-											hintText: 'Search',
-											hintStyle: TextStyle(color: Colors.grey),
-											border: InputBorder.none,
-										),
-									),
-								),
-							),
-							const SizedBox(width: 10),
-							const CircleAvatar(
-								radius: 20,
-								backgroundColor: Colors.black54,
-								child: Icon(Icons.person, color: Colors.white, size: 25),
-							),
-							const SizedBox(width: 15),
-							Stack(
-								children: [
-									const Icon(Icons.notifications_none, color: Colors.black87, size: 35),
-									Positioned(
-										right: 0,
-										top: 0,
-										child: Container(
-											width: 8,
-											height: 8,
-											decoration: const BoxDecoration(
-												color: Colors.red,
-												shape: BoxShape.circle,
-											),
-										),
-									),
-								],
-							),
-						],
-					),
-				),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: const Color(0xFFFFF6F6),
+    appBar: AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      toolbarHeight: 70,
+      iconTheme: const IconThemeData(color: Color(0xFFFF5A89)),
+      title: Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F6F6),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              height: 45,
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search',
+                  hintStyle: TextStyle(color: Colors.grey),
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          const CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.black54,
+            child: Icon(Icons.person, color: Colors.white, size: 25),
+          ),
+          const SizedBox(width: 15),
+          // Replace the static Stack with the dynamic notification icon
+          Consumer<NotificationManager>(
+            builder: (context, notificationManager, _) {
+              final unreadCount = notificationManager.unreadCount;
+              
+              return GestureDetector(
+                onTap: () {
+                  final RenderBox button = context.findRenderObject() as RenderBox;
+                  final position = button.localToGlobal(Offset.zero);
+                  
+                  showDialog(
+                    context: context,
+                    barrierColor: Colors.transparent,
+                    builder: (BuildContext context) {
+                      return Stack(
+                        children: [
+        // Notification center popup (now on top and clickable)
+    Positioned.fill(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).pop(),
+      ),
+    ),
+    // Notification center popup (now on top and clickable)
+    Positioned(
+      top: position.dy + 40,
+      right: 10,
+      child: const NotificationCenter(),
+    ),
+                        ],
+                      );
+                    },
+                  );
+                },
+                child: Stack(
+                  children: [
+                    const Icon(Icons.notifications_none, color: Colors.black87, size: 35),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: unreadCount > 9 ? BoxShape.rectangle : BoxShape.circle,
+                            borderRadius: unreadCount > 9 ? BorderRadius.circular(8) : null,
+                          ),
+                          child: Center(
+                            child: Text(
+                              unreadCount > 99 ? '99+' : '$unreadCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    ),
 				drawer: Drawer(
 					backgroundColor: const Color(0xFFFF9DB9),
 					child: SafeArea(
@@ -949,9 +1026,18 @@ if (events.isNotEmpty)
 			selectedStatus = eventData['event_status'];
 			uploadedImageUrl = eventData['image_url'];
 			dateController.text = eventData['event_date'] ?? '';
-			timeController.text = eventData['event_start_time'] ?? '';
-			timeControllerEnd.text = eventData['event_end_time'] ?? '';
-		}
+      if (dateController.text.isNotEmpty) {
+
+        try {
+        final parsedDate = DateTime.parse(dateController.text);
+        dayController.text = getDayOfWeek(parsedDate.weekday);
+        } catch (_) {
+        dayController.text = '';
+        }
+        }
+        timeController.text = eventData['event_start_time'] ?? '';
+        timeControllerEnd.text = eventData['event_end_time'] ?? '';
+      }
 
 		await showDialog(
 			context: context,
@@ -1155,14 +1241,7 @@ if (events.isNotEmpty)
 																				if (picked != null) {
 																					setModalState(() {
 																						dateController.text = DateFormat('yyyy-MM-dd').format(picked);
-																						if (dateController.text.isNotEmpty) {
-  final parsedDate = DateTime.tryParse(dateController.text);
-  if (parsedDate != null) {
-    dayController.text = getDayOfWeek(parsedDate.weekday);
-  } else {
-    dayController.text = '';
-  }
-}
+																						dayController.text = getDayOfWeek(picked.weekday);
 																					});
 																				}
 																			},
@@ -1475,19 +1554,27 @@ const SizedBox(height: 20),
 																final result = jsonDecode(response.body);
 
 																if (result['success'] == true) {
-																	ScaffoldMessenger.of(context).showSnackBar(
-																		SnackBar(
-																			content: Text(isEdit
-																					? "Event updated successfully"
-																					: "Event added successfully"),
-																		),
-																	);
-																	Navigator.of(context).pop(); // Close modal
-																} else {
-																	ScaffoldMessenger.of(context).showSnackBar(
-																		SnackBar(content: Text("Error: ${result['error']}")),
-																	);
-																}
+															ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Text(isEdit ? "Event updated successfully" : "Event added successfully"),
+  ),
+);
+
+// Add notification code here
+final notificationManager = Provider.of<NotificationManager>(context, listen: false);
+notificationManager.addNotification(
+  isEdit ? "Event Updated" : "Event Added",
+  isEdit 
+      ? "The event '${titleController.text}' was updated successfully"
+      : "New event '${titleController.text}' was added successfully",
+);
+
+Navigator.of(context).pop(); // Close modal
+} else {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text("Error: ${result['error']}")),
+  );
+}
 															},
 															style: ElevatedButton.styleFrom(
 																minimumSize: const Size(150, 20),
