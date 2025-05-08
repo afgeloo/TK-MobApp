@@ -285,156 +285,191 @@
 												style: const TextStyle(fontSize: 10)
 											)),
 											onTap: _isSelecting ? null : () {
-												showDialog(
-													context: context, 
-													builder: (context) {
-														return AlertDialog(
-															backgroundColor: const Color(0xFFFFF6F6),
-															shape: RoundedRectangleBorder(
-																borderRadius: BorderRadius.circular(10),
-															),
-															contentPadding: const EdgeInsets.all(24),
-															content: SingleChildScrollView(
-																child: Column(
-																	mainAxisSize: MainAxisSize.min,
-																	crossAxisAlignment: CrossAxisAlignment.start,
-																	children: [
-																		Row(
-																			mainAxisAlignment: MainAxisAlignment.end,
-																			children: [
-																				IconButton(
-																					icon: const Icon(Icons.close, color: Colors.black54),
-																					onPressed: () => Navigator.of(context).pop(),
-																				),
-																			],
-																		),
-																		if (event['image_url'] != null && event['image_url'].toString().isNotEmpty)
-                                      SizedBox(
-                                        height: 180,
-                                        width: double.infinity,
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: FittedBox(
-                                            fit: BoxFit.cover,
-                                            child: Image.network(
-                                              'http://10.0.2.2${event['image_url']}',
-                                              alignment: Alignment.center,
+                        showDialog(
+                          context: context,
+                          builder: (context) {
+                            return Dialog(
+                              backgroundColor: const Color(0xFFFFF6F6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              insetPadding: const EdgeInsets.symmetric(horizontal: 10), // same as edit modal
+                              child: SizedBox(
+                                width: MediaQuery.of(context).size.width,
+                                height: MediaQuery.of(context).size.height,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: SingleChildScrollView(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(24),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              const Text(
+                                                'EVENT DETAILS',
+                                                style: TextStyle(
+                                                  fontFamily: 'Bogart',
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 24,
+                                                  color: Color(0xFF3D3D3D),
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.close, color: Colors.black54),
+                                                onPressed: () => Navigator.of(context).pop(),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 20),
+                                          // Image
+                                          if (event['image_url'] != null && event['image_url'].toString().isNotEmpty)
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(12),
+                                              child: Image.network(
+                                                'http://10.0.2.2${event['image_url']}',
+                                                width: double.infinity,
+                                                height: 200,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              height: 200,
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: const Icon(Icons.image_not_supported, size: 60, color: Colors.grey),
+                                            ),
+                                
+                                          const SizedBox(height: 16),
+                                
+                                          // Title
+                                          Text(
+                                            event['title'] ?? 'Untitled',
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF3D3D3D),
                                             ),
                                           ),
-                                        ),
+                                
+                                          const SizedBox(height: 8),
+                                
+                                          // Event details
+                                          Wrap(
+                                            runSpacing: 4,
+                                            children: [
+                                              Text("📅 ${formatDate(event['event_date'] ?? '')}"),                                              
+                                              Text("🕓 ${event['event_start_time']} – ${event['event_end_time']}"),
+                                              Text("🎯 ${event['category']} | ${event['event_status']}"),
+                                              Text("🗣️ ${event['event_speakers'] ?? 'N/A'}"),
+                                              Text("📍 ${event['event_venue'] ?? 'N/A'}"),
+                                            ],
+                                          ),
+                                
+                                          const SizedBox(height: 16),
+                                
+                                          // Map
+                                          if ((event['event_venue'] ?? '').toString().isNotEmpty)
+                                            EmbedGoogleMapWidget(address: event['event_venue'] ?? ''),
+                                
+                                          const SizedBox(height: 20),
+                                
+                                          // Content
+                                          const Text("Content", style: TextStyle(fontWeight: FontWeight.bold)),
+                                          const SizedBox(height: 6),
+                                          Container(
+                                            constraints: const BoxConstraints(maxHeight: 300),
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Scrollbar(
+                                              thumbVisibility: true,
+                                              child: SingleChildScrollView(
+                                                child: HtmlWidget(
+                                                  (event['content'] ?? 'No content.').replaceAll('http://localhost/', 'http://10.0.2.2/'),
+                                                  baseUrl: Uri.parse('http://10.0.2.2/'),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                
+                                          const SizedBox(height: 24),
+                                
+                                          // Action buttons
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              TextButton.icon(
+                                                onPressed: () async {
+                                                  final confirm = await showDialog<bool>(
+                                                    context: context,
+                                                    builder: (context) => AlertDialog(
+                                                      title: const Text("Delete Event"),
+                                                      content: const Text("Are you sure you want to delete this event?"),
+                                                      actions: [
+                                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+                                                        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
+                                                      ],
+                                                    ),
+                                                  );
+                                
+                                                  if (confirm == true) {
+                                                    final deleteResponse = await http.post(
+                                                      Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_event.php'),
+                                                      headers: {'Content-Type': 'application/json'},
+                                                      body: jsonEncode({"event_id": event['event_id']}),
+                                                    );
+                                                    final result = jsonDecode(deleteResponse.body);
+                                                    if (result['success']) {
+                                                      Navigator.of(context).pop();
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        const SnackBar(content: Text("Event deleted successfully.")),
+                                                      );
+                                                      _loadEvents();
+                                                    } else {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        SnackBar(content: Text("Failed to delete: ${result['error']}")),
+                                                      );
+                                                    }
+                                                  }
+                                                },
+                                                icon: const Icon(Icons.delete, color: Colors.white),
+                                                label: const Text("Delete", style: TextStyle(color: Colors.white)),
+                                                style: TextButton.styleFrom(
+                                                  backgroundColor: const Color(0xFFE94B4B),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              TextButton.icon(
+                                                onPressed: () {
+                                                  Navigator.of(context).pop();
+                                                  showEventDialog(context, isEdit: true, eventData: event);
+                                                },
+                                                icon: const Icon(Icons.edit, color: Colors.white),
+                                                label: const Text("Edit", style: TextStyle(color: Colors.white)),
+                                                style: TextButton.styleFrom(
+                                                  backgroundColor: const Color(0xFF4DB1E3),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
-
-																		const SizedBox(height: 16),
-																		HtmlWidget(
-																		event['title'] ?? '',
-																		textStyle: const TextStyle(fontSize: 16),
-																		),
-																		const SizedBox(height: 8),
-																		Text("Category: ${event['category'] ?? 'N/A'}"),
-																		Text("Status: ${event['event_status'] ?? 'N/A'}"),
-																		Text("Date: ${formatDate(event['event_date'] ?? '')}"),
-																		const SizedBox(height: 8),
-																		const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
-																		const SizedBox(height: 4),
-															Container(
-																	width: double.infinity,
-																	padding: const EdgeInsets.all(12),
-																	margin: const EdgeInsets.only(top: 8),
-																	decoration: BoxDecoration(
-																		color: Colors.white,
-																		borderRadius: BorderRadius.circular(8),
-																		boxShadow: [
-																		BoxShadow(
-																			color: Colors.black12,
-																			blurRadius: 4,
-																			offset: Offset(0, 2),
-																		),
-																		],
-																	),
-																	child: HtmlWidget(
-																		(event['content'] ?? 'No content.').replaceAll('http://localhost', 'http://10.0.2.2'),
-																		baseUrl: Uri.parse('http://10.0.2.2'),
-																		textStyle: const TextStyle(fontSize: 14, color: Colors.black87),
-																	),
-																	),
-																		ConstrainedBox(
-																			constraints: const BoxConstraints(
-																				maxHeight: 300, // You can adjust the height if needed
-																			),
-																			child: SingleChildScrollView(
-																				child: HtmlWidget(
-																			    (event['content'] ?? 'No content.').replaceAll('http://localhost/', 'http://10.0.2.2/'),
-                                           baseUrl: Uri.parse('http://10.0.2.2/'),
-                                         ),
-																			  ),
-																			),
-																		const SizedBox(height: 20),
-																		Row(
-																			children: [
-																				Spacer(), // pushes buttons to the right
-																				ElevatedButton.icon(
-																					onPressed: () async {
-																						final confirm = await showDialog<bool>(
-																							context: context,
-																							builder: (context) => AlertDialog(
-																								title: const Text("Delete Event"),
-																								content: const Text("Are you sure you want to delete this event?"),
-																								actions: [
-																									TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-																									TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
-																								],
-																							),
-																						);
-
-																						if (confirm == true) {
-																							final deleteResponse = await http.post(
-																								Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_event.php'),
-																								headers: {'Content-Type': 'application/json'},
-																								body: jsonEncode({"event_id": event['event_id']}),
-																							);
-
-																							final deleteResult = jsonDecode(deleteResponse.body);
-																							if (deleteResult['success']) {
-																								Navigator.of(context).pop(); // Close the modal
-																								ScaffoldMessenger.of(context).showSnackBar(
-																									const SnackBar(content: Text("Event deleted successfully.")),
-																								);
-																								_loadEvents(); // Reload events after deletion
-																							} else {
-																								ScaffoldMessenger.of(context).showSnackBar(
-																									SnackBar(content: Text("Failed to delete: ${deleteResult['error']}")),
-																								);
-																							}
-																						}
-																					},
-																					style: ElevatedButton.styleFrom(
-																						backgroundColor: const Color(0xFFE94B4B), // red
-																						foregroundColor: Colors.white,
-																					),
-																					icon: const Icon(Icons.delete),
-																					label: const Text("Delete"),
-																				),
-																				const SizedBox(width: 10),
-																				ElevatedButton.icon(
-																					onPressed: () {
-																						Navigator.of(context).pop(); // Close the current view modal
-																						showEventDialog(context, isEdit: true, eventData: event);
-																					},
-																					style: ElevatedButton.styleFrom(
-																						backgroundColor: const Color(0xFF4DB1E3), // blue
-																						foregroundColor: Colors.white,
-																					),
-																					icon: const Icon(Icons.edit),
-																					label: const Text("Edit"),
-																				),
-																			],
-																		),
-																	],
-																),
-															),
-														);
-													},
-												);
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
 											},
 										),
 										DataCell(SizedBox(width: 70, child: Text(
