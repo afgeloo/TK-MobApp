@@ -359,13 +359,21 @@
                                           const SizedBox(height: 8),
                                 
                                           // Event details
-                                          Wrap(
-                                            runSpacing: 4,
+
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text("📅 ${formatDate(event['event_date'] ?? '')}"),                                              
-                                              Text("🕓 ${event['event_start_time']} – ${event['event_end_time']}"),
+                                              Wrap(
+                                                runSpacing: 4,
+                                                children: [
+                                                  Text("📅 ${formatDate(event['event_date'] ?? '')}"),
+                                                  Text("🕓 ${event['event_start_time']} – ${event['event_end_time']}"),
+                                                ],
+                                              ),
                                               Text("🎯 ${event['category']} | ${event['event_status']}"),
+                                              const SizedBox(height: 4),
                                               Text("🗣️ ${event['event_speakers'] ?? 'N/A'}"),
+                                              const SizedBox(height: 4),
                                               Text("📍 ${event['event_venue'] ?? 'N/A'}"),
                                             ],
                                           ),
