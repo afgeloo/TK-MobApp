@@ -31,7 +31,7 @@
 	String formatDate(String rawDate) {
 		try {
 			final parsedDate = DateTime.parse(rawDate);
-			return DateFormat('MMMM d, y').format(parsedDate);
+			return DateFormat('MMM. d, y').format(parsedDate);
 		} catch (_) {
 			return rawDate;
 		}
@@ -220,12 +220,15 @@
 								],
 							),
 						),
-					SingleChildScrollView(
+						Container(
+  width: double.infinity,
+					child: SingleChildScrollView(
 						scrollDirection: Axis.horizontal,
 						child: DataTable(
 							columnSpacing: 10,
-							headingRowHeight: 56,
-							dataRowHeight: 60,
+  headingRowHeight: 56,
+  dataRowMinHeight: 60,
+  dataRowMaxHeight: 60, 
 							dividerThickness: 0,
 							showCheckboxColumn: _isSelecting,
 							headingRowColor: WidgetStateProperty.all(Colors.transparent),
@@ -269,7 +272,7 @@
 										if (_isSelecting)
 											DataCell(Container()), // Empty cell for checkbox column
 										DataCell(
-											SizedBox(width: 60, child: Text(
+											SizedBox(width: 75, child: Text(
 												event['category'] ?? 'Uncategorized',
 												overflow: TextOverflow.ellipsis,
 												style: const TextStyle(fontSize: 10, color: Color(0xFFFF5A89))
@@ -329,9 +332,9 @@
 																		const SizedBox(height: 8),
 																		const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
 																		const SizedBox(height: 4),
-																		HtmlWidget(
-																			event['content'] ?? 'No content.',
-																			baseUrl: Uri.parse('http://10.0.2.2'),
+															HtmlWidget(
+																		(event['content'] ?? 'No content.').replaceAll('http://localhost', 'http://10.0.2.2'),
+																		baseUrl: Uri.parse('http://10.0.2.2'),
 																		),
 																		const SizedBox(height: 20),
 																		Row(
@@ -407,9 +410,8 @@
 											overflow: TextOverflow.ellipsis,
 											style: const TextStyle(fontSize: 10)
 										))),
-										DataCell(SizedBox(width: 60, child: Text(
+										DataCell(SizedBox(width: 65, child: Text(
 											formatDate(event['event_date'] ?? ''),
-											overflow: TextOverflow.ellipsis,
 											style: const TextStyle(fontSize: 10)
 										))),
 									],
@@ -417,6 +419,7 @@
 							}).toList(),
 						),
 					),
+						),
 					// Pagination controls UI
 // ADDED: Pagination controls UI with the design you requested
 if (events.isNotEmpty)
