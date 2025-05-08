@@ -1,6 +1,7 @@
 	import 'package:flutter/material.dart';
 	import 'blogs.dart';
 	import 'settings.dart';
+	import 'map_picker.dart';
 	import 'dart:convert';
 	import 'package:http/http.dart' as http;
 	import 'package:intl/intl.dart';
@@ -10,6 +11,9 @@
 	import 'package:image_picker/image_picker.dart' as img_picker;
 	import 'package:html_editor_enhanced/html_editor.dart';
   import 'widgets/google_map.dart';
+import 'package:provider/provider.dart';
+import 'widgets/notification_service.dart';
+import 'widgets/notification_center.dart';
 
 
 	// Fetch Events Data
@@ -36,6 +40,16 @@
 			return rawDate;
 		}
 	}
+
+	String _formatTime(String? time) {
+  if (time == null || time.isEmpty) return '';
+  try {
+    final parsedTime = DateFormat("HH:mm").parse(time);
+    return DateFormat("h:mm a").format(parsedTime); // Example: 2:30 PM
+  } catch (_) {
+    return time; // Fallback to original if parsing fails
+  }
+}
 
 	class EventsPage extends StatefulWidget {
 		const EventsPage({super.key});
@@ -132,6 +146,7 @@
 							headers: {'Content-Type': 'application/json'},
 							body: jsonEncode({"event_id": eventId}),
 						);
+						
 
 						final deleteResult = jsonDecode(deleteResponse.body);
 						if (!deleteResult['success']) {
@@ -163,6 +178,12 @@
 				} else {
 					ScaffoldMessenger.of(context).showSnackBar(
 						const SnackBar(content: Text("Events deleted successfully")),
+					);
+
+					final notificationManager = Provider.of<NotificationManager>(context, listen: false);
+					notificationManager.addNotification(
+						"Events Deleted",
+						"Successfully deleted ${_selectedEventIds.length} events",
 					);
 				}
 			}
@@ -273,7 +294,7 @@
 											DataCell(Container()), // Empty cell for checkbox column
 										DataCell(
 											SizedBox(width: 75, child: Text(
-												event['category'] ?? 'KALUSUGAN',
+												event['category'] ?? 'Uncategorized',
 												overflow: TextOverflow.ellipsis,
 												style: const TextStyle(fontSize: 10, color: Color(0xFFFF5A89))
 											)),
@@ -359,21 +380,13 @@
                                           const SizedBox(height: 8),
                                 
                                           // Event details
-
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                          Wrap(
+                                            runSpacing: 4,
                                             children: [
-                                              Wrap(
-                                                runSpacing: 4,
-                                                children: [
-                                                  Text("📅 ${formatDate(event['event_date'] ?? '')}"),
-                                                  Text("🕓 ${event['event_start_time']} – ${event['event_end_time']}"),
-                                                ],
-                                              ),
+                                              Text("📅 ${formatDate(event['event_date'] ?? '')} | "),                                              
+																							Text("🕓 ${_formatTime(event['event_start_time'])} – ${_formatTime(event['event_end_time'])}"),
                                               Text("🎯 ${event['category']} | ${event['event_status']}"),
-                                              const SizedBox(height: 4),
                                               Text("🗣️ ${event['event_speakers'] ?? 'N/A'}"),
-                                              const SizedBox(height: 4),
                                               Text("📍 ${event['event_venue'] ?? 'N/A'}"),
                                             ],
                                           ),
@@ -439,6 +452,11 @@
                                                       ScaffoldMessenger.of(context).showSnackBar(
                                                         const SnackBar(content: Text("Event deleted successfully.")),
                                                       );
+																											final notificationManager = Provider.of<NotificationManager>(context, listen: false);
+																										notificationManager.addNotification(
+																											"Event Deleted",
+																											"The event '${event['title']}' was deleted successfully",
+																										);
                                                       _loadEvents();
                                                     } else {
                                                       ScaffoldMessenger.of(context).showSnackBar(
@@ -480,7 +498,7 @@
                         );
 											},
 										),
-										DataCell(SizedBox(width: 60, child: Text(
+										DataCell(SizedBox(width: 70, child: Text(
 											event['event_status'] ?? 'Unknown',
 											overflow: TextOverflow.ellipsis,
 											style: const TextStyle(fontSize: 10)
@@ -592,7 +610,7 @@ if (events.isNotEmpty)
         
         // Page info text
         Text(
-          'Showing ${events.isEmpty ? 0 : startIndex + 1} to $endIndex of ${events.length} entries',
+          '${events.isEmpty ? 0 : startIndex + 1} - $endIndex of ${events.length} events',
           style: const TextStyle(color: Colors.grey, fontSize: 12),
         ),
       ],
@@ -603,62 +621,114 @@ if (events.isNotEmpty)
 		);
 	}
 
-		@override
-		Widget build(BuildContext context) {
-			return Scaffold(
-				backgroundColor: const Color(0xFFFFF6F6),
-				appBar: AppBar(
-					backgroundColor: Colors.white,
-					elevation: 0,
-					toolbarHeight: 70,
-					iconTheme: const IconThemeData(color: Color(0xFFFF5A89)),
-					title: Row(
-						children: [
-							Expanded(
-								child: Container(
-									padding: const EdgeInsets.symmetric(horizontal: 16),
-									decoration: BoxDecoration(
-										color: const Color(0xFFF6F6F6),
-										borderRadius: BorderRadius.circular(40),
-									),
-									height: 45,
-									child:  TextField(
-										controller: _searchController,
-										decoration: InputDecoration(
-											hintText: 'Search',
-											hintStyle: TextStyle(color: Colors.grey),
-											border: InputBorder.none,
-										),
-									),
-								),
-							),
-							const SizedBox(width: 10),
-							const CircleAvatar(
-								radius: 20,
-								backgroundColor: Colors.black54,
-								child: Icon(Icons.person, color: Colors.white, size: 25),
-							),
-							const SizedBox(width: 15),
-							Stack(
-								children: [
-									const Icon(Icons.notifications_none, color: Colors.black87, size: 35),
-									Positioned(
-										right: 0,
-										top: 0,
-										child: Container(
-											width: 8,
-											height: 8,
-											decoration: const BoxDecoration(
-												color: Colors.red,
-												shape: BoxShape.circle,
-											),
-										),
-									),
-								],
-							),
-						],
-					),
-				),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: const Color(0xFFFFF6F6),
+    appBar: AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      toolbarHeight: 70,
+      iconTheme: const IconThemeData(color: Color(0xFFFF5A89)),
+      title: Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F6F6),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              height: 45,
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search',
+                  hintStyle: TextStyle(color: Colors.grey),
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          const CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.black54,
+            child: Icon(Icons.person, color: Colors.white, size: 25),
+          ),
+          const SizedBox(width: 15),
+          // Replace the static Stack with the dynamic notification icon
+          Consumer<NotificationManager>(
+            builder: (context, notificationManager, _) {
+              final unreadCount = notificationManager.unreadCount;
+              
+              return GestureDetector(
+                onTap: () {
+                  final RenderBox button = context.findRenderObject() as RenderBox;
+                  final position = button.localToGlobal(Offset.zero);
+                  
+                  showDialog(
+                    context: context,
+                    barrierColor: Colors.transparent,
+                    builder: (BuildContext context) {
+                      return Stack(
+                        children: [
+        // Notification center popup (now on top and clickable)
+    Positioned.fill(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).pop(),
+      ),
+    ),
+    // Notification center popup (now on top and clickable)
+    Positioned(
+      top: position.dy + 40,
+      right: 10,
+      child: const NotificationCenter(),
+    ),
+                        ],
+                      );
+                    },
+                  );
+                },
+                child: Stack(
+                  children: [
+                    const Icon(Icons.notifications_none, color: Colors.black87, size: 35),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: unreadCount > 9 ? BoxShape.rectangle : BoxShape.circle,
+                            borderRadius: unreadCount > 9 ? BorderRadius.circular(8) : null,
+                          ),
+                          child: Center(
+                            child: Text(
+                              unreadCount > 99 ? '99+' : '$unreadCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    ),
 				drawer: Drawer(
 					backgroundColor: const Color(0xFFFF9DB9),
 					child: SafeArea(
@@ -894,6 +964,17 @@ if (events.isNotEmpty)
 		}
 	}
 
+	Future<void> openMapPicker(BuildContext context, TextEditingController venueController) async {
+		final LatLng? pickedLocation = await Navigator.push(
+			context,
+			MaterialPageRoute(builder: (context) => MapPickerScreen()),
+		);
+
+		if (pickedLocation != null) {
+			venueController.text = '${pickedLocation.latitude}, ${pickedLocation.longitude}';
+		}
+	}
+
 	// Upload image and return its server URL
 	Future<String?> uploadEventImage(img_picker.XFile imageFile) async {
 		var request = http.MultipartRequest(
@@ -945,9 +1026,18 @@ if (events.isNotEmpty)
 			selectedStatus = eventData['event_status'];
 			uploadedImageUrl = eventData['image_url'];
 			dateController.text = eventData['event_date'] ?? '';
-			timeController.text = eventData['event_start_time'] ?? '';
-			timeControllerEnd.text = eventData['event_end_time'] ?? '';
-		}
+      if (dateController.text.isNotEmpty) {
+
+        try {
+        final parsedDate = DateTime.parse(dateController.text);
+        dayController.text = getDayOfWeek(parsedDate.weekday);
+        } catch (_) {
+        dayController.text = '';
+        }
+        }
+        timeController.text = eventData['event_start_time'] ?? '';
+        timeControllerEnd.text = eventData['event_end_time'] ?? '';
+      }
 
 		await showDialog(
 			context: context,
@@ -1087,40 +1177,45 @@ if (events.isNotEmpty)
 														isDense: true,
 														contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
 													),
-													items: ['KALUSUGAN', 'KALIKASAN', 'KARUNUNGAN', 'KULTURA', 'KASARIAN']
+													items: [ 'KALUSUGAN', 'KALIKASAN', 'KARUNUNGAN', 'KULTURA', 'KASARIAN']
 															.map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
 															.toList(),
 													onChanged: (val) => selectedCategory = val,
 												),
 												const SizedBox(height: 12),
 
-                        const Text('Venue', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: venueController,
-                          decoration: const InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            suffixIcon: Icon(Icons.location_on_outlined, size: 15, color: Colors.grey),
-                            suffixIconConstraints: BoxConstraints(
-                              minHeight: 24, minWidth: 24, maxHeight: 24, maxWidth: 24,
-                            ),
-                          ),
-                          onChanged: (val) {
-                            // re-render the iframe below
-                            setModalState(() {});
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // --- your map embed will now always reflect venueController.text:
-
-                        EmbedGoogleMapWidget(address: venueController.text),
-                        const SizedBox(height: 12),
-
+												// Venue (Map Picker)
+												const Text('Venue', style: TextStyle(fontWeight: FontWeight.bold)),
+												const SizedBox(height: 6),
+												TextField(
+													controller: venueController,
+													readOnly: true,
+													onTap: () async {
+														final LatLng? pickedLocation = await Navigator.push(
+															context,
+															MaterialPageRoute(builder: (_) => MapPickerScreen()),
+														);
+														if (pickedLocation != null) {
+															setModalState(() {
+																venueController.text =
+																		'${pickedLocation.latitude}, ${pickedLocation.longitude}';
+															});
+														}
+													},
+													decoration: InputDecoration(
+														filled: true,
+														fillColor: Colors.white,
+														border: InputBorder.none,
+														isDense: true,
+														contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+														suffixIcon:
+																const Icon(Icons.location_on_outlined, size: 15, color: Colors.grey),
+														suffixIconConstraints: const BoxConstraints(
+															minHeight: 24, minWidth: 24, maxHeight: 24, maxWidth: 24,
+														),
+													),
+												),
+												const SizedBox(height: 12),
 
 												// Only for "Add" mode: Date, Day, Start & End time
 										
@@ -1459,19 +1554,27 @@ const SizedBox(height: 20),
 																final result = jsonDecode(response.body);
 
 																if (result['success'] == true) {
-																	ScaffoldMessenger.of(context).showSnackBar(
-																		SnackBar(
-																			content: Text(isEdit
-																					? "Event updated successfully"
-																					: "Event added successfully"),
-																		),
-																	);
-																	Navigator.of(context).pop(); // Close modal
-																} else {
-																	ScaffoldMessenger.of(context).showSnackBar(
-																		SnackBar(content: Text("Error: ${result['error']}")),
-																	);
-																}
+															ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Text(isEdit ? "Event updated successfully" : "Event added successfully"),
+  ),
+);
+
+// Add notification code here
+final notificationManager = Provider.of<NotificationManager>(context, listen: false);
+notificationManager.addNotification(
+  isEdit ? "Event Updated" : "Event Added",
+  isEdit 
+      ? "The event '${titleController.text}' was updated successfully"
+      : "New event '${titleController.text}' was added successfully",
+);
+
+Navigator.of(context).pop(); // Close modal
+} else {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text("Error: ${result['error']}")),
+  );
+}
 															},
 															style: ElevatedButton.styleFrom(
 																minimumSize: const Size(150, 20),
