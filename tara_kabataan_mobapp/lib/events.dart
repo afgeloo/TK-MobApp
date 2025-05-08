@@ -306,17 +306,21 @@
 																			],
 																		),
 																		if (event['image_url'] != null && event['image_url'].toString().isNotEmpty)
-																			SizedBox(
-																				height: 180,
-																				width: double.infinity,
-																				child: ClipRRect(
-																					borderRadius: BorderRadius.circular(12),
-																					child: Image.network(
-																						'http://10.0.2.2${event['image_url']}',
-																						fit: BoxFit.cover,
-																					),
-																				),
-																			),
+                                      SizedBox(
+                                        height: 180,
+                                        width: double.infinity,
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: FittedBox(
+                                            fit: BoxFit.cover,
+                                            child: Image.network(
+                                              'http://10.0.2.2${event['image_url']}',
+                                              alignment: Alignment.center,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
 																		const SizedBox(height: 16),
 																		HtmlWidget(
 																		event['title'] ?? '',
@@ -335,10 +339,10 @@
 																			),
 																			child: SingleChildScrollView(
 																				child: HtmlWidget(
-																			event['content'] ?? 'No content.',
-																			baseUrl: Uri.parse('http://10.0.2.2'),
-																				),
-																			),
+																			    (event['content'] ?? 'No content.').replaceAll('http://localhost/', 'http://10.0.2.2/'),
+                                           baseUrl: Uri.parse('http://10.0.2.2/'),
+                                         ),
+																			  ),
 																			),
 																		const SizedBox(height: 20),
 																		Row(
