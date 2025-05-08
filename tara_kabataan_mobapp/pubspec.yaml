@@ -35,7 +35,7 @@ dependencies:
   flutter_widget_from_html: ^0.16.0
   google_maps_flutter: ^2.5.0
   image_picker: ^1.1.2
-  flutter_inappwebview: ^6.0.0
+  flutter_inappwebview: ^6.1.5
   file_picker: ^8.3.7
   
 
