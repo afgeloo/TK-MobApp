@@ -10,6 +10,7 @@
 	import 'dart:io';
 	import 'package:image_picker/image_picker.dart' as img_picker;
 	import 'package:html_editor_enhanced/html_editor.dart';
+  import 'widgets/google_map.dart';
 
 
 	// Fetch Events Data
@@ -1154,7 +1155,14 @@ if (events.isNotEmpty)
 																				if (picked != null) {
 																					setModalState(() {
 																						dateController.text = DateFormat('yyyy-MM-dd').format(picked);
-																						dayController.text = getDayOfWeek(picked.weekday);
+																						if (dateController.text.isNotEmpty) {
+  final parsedDate = DateTime.tryParse(dateController.text);
+  if (parsedDate != null) {
+    dayController.text = getDayOfWeek(parsedDate.weekday);
+  } else {
+    dayController.text = '';
+  }
+}
 																					});
 																				}
 																			},
