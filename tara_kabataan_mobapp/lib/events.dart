@@ -380,11 +380,16 @@ import 'widgets/notification_center.dart';
                                           const SizedBox(height: 8),
                                 
                                           // Event details
-                                          Wrap(
-                                            runSpacing: 4,
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text("📅 ${formatDate(event['event_date'] ?? '')} | "),                                              
-																							Text("🕓 ${_formatTime(event['event_start_time'])} – ${_formatTime(event['event_end_time'])}"),
+                                              Wrap(
+                                                runSpacing: 4,
+                                                children: [
+                                                  Text("📅 ${formatDate(event['event_date'] ?? '')} | "),                                              
+                                                  Text("🕓 ${_formatTime(event['event_start_time'])} – ${_formatTime(event['event_end_time'])}"),
+                                                ],
+                                              ),
                                               Text("🎯 ${event['category']} | ${event['event_status']}"),
                                               Text("🗣️ ${event['event_speakers'] ?? 'N/A'}"),
                                               Text("📍 ${event['event_venue'] ?? 'N/A'}"),
