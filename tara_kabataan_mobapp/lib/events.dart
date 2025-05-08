@@ -329,10 +329,17 @@
 																		const SizedBox(height: 8),
 																		const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
 																		const SizedBox(height: 4),
-															HtmlWidget(
-																		(event['content'] ?? 'No content.').replaceAll('http://localhost', 'http://10.0.2.2'),
-																		baseUrl: Uri.parse('http://10.0.2.2'),
-																		),
+																		ConstrainedBox(
+																			constraints: const BoxConstraints(
+																				maxHeight: 300, // You can adjust the height if needed
+																			),
+																			child: SingleChildScrollView(
+																				child: HtmlWidget(
+																				(event['content'] ?? 'No content.').replaceAll('http://localhost', 'http://10.0.2.2'),
+																				baseUrl: Uri.parse('http://10.0.2.2'),
+																				),
+																			),
+																			),
 																		const SizedBox(height: 20),
 																		Row(
 																			children: [
