@@ -1189,40 +1189,31 @@ Widget build(BuildContext context) {
 												),
 												const SizedBox(height: 12),
 
-												// Venue (Map Picker)
-												const Text('Venue', style: TextStyle(fontWeight: FontWeight.bold)),
-												const SizedBox(height: 6),
-												TextField(
-													controller: venueController,
-													readOnly: true,
-													onTap: () async {
-														final LatLng? pickedLocation = await Navigator.push(
-															context,
-															MaterialPageRoute(builder: (_) => MapPickerScreen()),
-														);
-														if (pickedLocation != null) {
-															setModalState(() {
-																venueController.text =
-																		'${pickedLocation.latitude}, ${pickedLocation.longitude}';
-															});
-														}
-													},
-													decoration: InputDecoration(
-														filled: true,
-														fillColor: Colors.white,
-														border: InputBorder.none,
-														isDense: true,
-														contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-														suffixIcon:
-																const Icon(Icons.location_on_outlined, size: 15, color: Colors.grey),
-														suffixIconConstraints: const BoxConstraints(
-															minHeight: 24, minWidth: 24, maxHeight: 24, maxWidth: 24,
-														),
-													),
-												),
-												const SizedBox(height: 12),
+                        const Text('Venue', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: venueController,
+                          decoration: const InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            suffixIcon: Icon(Icons.location_on_outlined, size: 15, color: Colors.grey),
+                            suffixIconConstraints: BoxConstraints(
+                              minHeight: 24, minWidth: 24, maxHeight: 24, maxWidth: 24,
+                            ),
+                          ),
+                          onChanged: (val) {
+                            // re-render the iframe below
+                            setModalState(() {});
+                          },
+                        ),
+                        const SizedBox(height: 8),
 
-												// Only for "Add" mode: Date, Day, Start & End time
+
+                        EmbedGoogleMapWidget(address: venueController.text),
+                        const SizedBox(height: 12),
 										
 													Row(
 														children: [
