@@ -184,7 +184,7 @@ class _MembersTabState extends State<MembersTab> {
                     ...members.map((member) => _MemberCard(
                           name: member['member_name'],
                           role: member['role_name'],
-                          imageUrl: 'http://10.0.2.2/tara-kabataan${member['member_image']}',
+                          imageUrl: 'http://10.0.2.2//tara-kabataan${member['member_image']}',
                           onTap: () => _showMemberDialog(member),
                           width: itemWidth,
                         )),
