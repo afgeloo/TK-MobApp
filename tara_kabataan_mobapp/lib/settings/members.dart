@@ -79,7 +79,7 @@ class _MembersTabState extends State<MembersTab> {
             // Revert to Image.network for image display
             member['member_image'] != null && member['member_image'].isNotEmpty
                 ? Image.network(
-                    'http://10.0.2.2/tara-kabataan${member['member_image']}',
+                    'http://10.0.2.2/${member['member_image']}',
                     width: 100,
                     height: 100,
                     fit: BoxFit.cover,
@@ -196,7 +196,7 @@ class _MembersTabState extends State<MembersTab> {
                     ...members.map((member) => _MemberCard(
                           name: member['member_name'],
                           role: member['role_name'],
-                          imageUrl: 'http://10.0.2.2/tara-kabataan${member['member_image']}',
+                          imageUrl: 'http://10.0.2.2/${member['member_image']}',
                           onTap: () => _showMemberDialog(member),
                           width: itemWidth,
                         )),
@@ -232,6 +232,12 @@ class _MemberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Clean image URL
+    final sanitizedPath = imageUrl.startsWith('//')
+        ? imageUrl.replaceFirst('//', '/')
+        : imageUrl;
+    final fullUrl = sanitizedPath;
+
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -284,12 +290,12 @@ class _MemberCard extends StatelessWidget {
                   backgroundColor: Colors.white,
                   child: ClipOval(
                     child: CachedNetworkImage(
-                      imageUrl: imageUrl,
+                      imageUrl: fullUrl,
                       width: 54,
                       height: 54,
                       fit: BoxFit.cover,
-                      placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                      errorWidget: (context, url, error) => const Icon(Icons.broken_image, size: 30, color: Colors.grey),
+                      placeholder: (context, url) => const CircularProgressIndicator(strokeWidth: 2),
+                      errorWidget: (context, url, error) => const Icon(Icons.broken_image, size: 30),
                     ),
                   ),
                 ),
@@ -301,6 +307,7 @@ class _MemberCard extends StatelessWidget {
     );
   }
 }
+
 
 class _AddMemberTile extends StatelessWidget {
   final VoidCallback onTap;
