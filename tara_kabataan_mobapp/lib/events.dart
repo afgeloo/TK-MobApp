@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'blogs.dart';
-import 'settings.dart';
+import 'settings/settings.dart';
 import 'map_picker.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
