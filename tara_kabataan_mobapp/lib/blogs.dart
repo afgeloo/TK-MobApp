@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'add_blogs_container.dart';
 
 Future<List<Map<String, dynamic>>> fetchBlogs() async {
   final response = await http.get(
@@ -31,12 +32,115 @@ String formatDate(String rawDate) {
   }
 }
 
-class BlogsPage extends StatelessWidget {
+class BlogsPage extends StatefulWidget {
   const BlogsPage({super.key});
+
+  @override
+  State<BlogsPage> createState() => _BlogsPageState();
+}
+
+class _BlogsPageState extends State<BlogsPage> {
+  Map<int, bool> selectedRows = {};
+  bool isBulkSelecting = false;
+  List<Map<String, dynamic>> _blogs = [];
+  bool isLoading = false;
+
+  void toggleBulkSelection() {
+    setState(() {
+      isBulkSelecting = !isBulkSelecting;
+      if (isBulkSelecting) {
+        // Select all rows
+        for (int i = 0; i < _blogs.length; i++) {
+          selectedRows[i] = true;
+        }
+      } else {
+        // Deselect all rows
+        selectedRows = {};
+      }
+    });
+  }
 
   void _navigateTo(BuildContext context, Widget page) {
     Navigator.pop(context);
     Navigator.push(context, MaterialPageRoute(builder: (context) => page));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBlogs();
+  }
+
+  // Function to load blogs from API
+  Future<void> _loadBlogs() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final blogs = await fetchBlogs();
+      setState(() {
+        _blogs = blogs;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading blogs: $e')),
+      );
+    }
+  }
+
+  // Function to refresh blogs after adding a new one
+  void _refreshBlogs() {
+    _loadBlogs();
+  }
+
+  // Function to delete a blog
+  Future<bool> _deleteBlog(int blogId) async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final response = await http.delete(
+        Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/blogs.php?id=$blogId'),
+      );
+
+      setState(() {
+        isLoading = false;
+      });
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          // Refresh blogs list after successful deletion
+          _refreshBlogs();
+          return true;
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${data['message'] ?? "Failed to delete blog"}'))
+          );
+          return false;
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: Server returned status code ${response.statusCode}'))
+        );
+        return false;
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting blog: $e')),
+      );
+      return false;
+    }
   }
 
   @override
@@ -179,14 +283,25 @@ class BlogsPage extends StatelessWidget {
                     color: Color(0xFF3D3D3D),
                   ),
                 ),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF00A3FF),
-                    shape: BoxShape.circle,
+                GestureDetector(
+                  onTap: () {
+                    // Show Add Blog dialog using the component from add_blogs_container.dart
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) => AddBlogDialog(
+                        onBlogAdded: _refreshBlogs,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00A3FF),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add, color: Colors.white, size: 20),
                   ),
-                  child: const Icon(Icons.add, color: Colors.white, size: 20),
                 ),
               ],
             ),
@@ -221,13 +336,30 @@ class BlogsPage extends StatelessWidget {
                 ),
                 const SizedBox(width: 20),
                 _pillButton(
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.check_box_outlined, size: 16),
-                      SizedBox(width: 6),
-                      Text('Select', style: TextStyle(fontSize: 16)),
+                      Icon(
+                        isBulkSelecting ? Icons.check_box : Icons.check_box_outlined,
+                        size: 16
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('Select', style: TextStyle(fontSize: 16)),
                     ],
                   ),
+                  onTap: () {
+                    setState(() {
+                      isBulkSelecting = !isBulkSelecting;
+                      if (isBulkSelecting) {
+                        // Select all rows
+                        for (int i = 0; i < _blogs.length; i++) {
+                          selectedRows[i] = true;
+                        }
+                      } else {
+                        // Deselect all rows
+                        selectedRows = {};
+                      }
+                    });
+                  },
                 ),
               ],
             ),
@@ -247,29 +379,47 @@ class BlogsPage extends StatelessWidget {
                   }
 
                   final blogs = snapshot.data!;
+                  _blogs = blogs; // Store blogs in class variable for bulk selection
                   return Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     padding: const EdgeInsets.all(10),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columnSpacing: 10,
-                        headingRowHeight: 56,
-                        dataRowHeight: 60,
-                        dividerThickness: 0,
-                        showCheckboxColumn: false,
-                        headingRowColor: WidgetStateProperty.all(
-                          Colors.transparent,
-                        ),
+                    child: isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _blogs.isEmpty
+                        ? const Center(child: Text('No blogs found'))
+                        : Column(
+                          children: [
+                            Expanded(
+                              child: Scrollbar(
+                                thumbVisibility: false,
+                                trackVisibility: false,
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.vertical,
+                                  child: Scrollbar(
+                                    thumbVisibility: false,
+                                    trackVisibility: false,
+                                    scrollbarOrientation: ScrollbarOrientation.bottom,
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: DataTable(
+                            columnSpacing: 10,
+                            headingRowHeight: 56,
+                            dataRowHeight: 60,
+                            dividerThickness: 0,
+                            showCheckboxColumn: false, // Remove built-in checkbox column
+                            headingRowColor: MaterialStateProperty.all(
+                              Colors.transparent,
+                            ),
                         border: TableBorder(
                           horizontalInside: BorderSide.none,
                           top: BorderSide.none,
                           bottom: BorderSide.none,
                         ),
                         columns: const [
+                          DataColumn(label: SizedBox.shrink()), // Checkbox column
                           DataColumn(
                             label: Text(
                               'Category',
@@ -307,74 +457,191 @@ class BlogsPage extends StatelessWidget {
                             ),
                           ),
                         ],
-                        rows:
-                            blogs.map((blog) {
-                              return DataRow(
-                                onSelectChanged: (_) {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) {
-                                      return AlertDialog(
-                                        backgroundColor: const Color(
-                                          0xFFFFF6F6,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                        contentPadding: const EdgeInsets.all(
-                                          24,
-                                        ),
-                                        content: SingleChildScrollView(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              if (blog['image_url'] != null && blog['image_url'].toString().isNotEmpty)
-                                                ClipRRect(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  child: Image.network(
-                                                    'http://10.0.2.2/tara-kabataan/tara-kabataan-webapp/uploads/blogs-images/${blog['image_url']}',
-                                                    height: 180,
-                                                    width: double.infinity,
-                                                    fit: BoxFit.cover,
+                        rows: blogs.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final blog = entry.value;
+                              
+                              // Function to show blog details dialog
+                              void showBlogDetailsDialog() {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    return Dialog(
+                                      insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        alignment: Alignment.topRight,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                                            width: double.infinity,
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                // Close button
+                                                Align(
+                                                  alignment: Alignment.topRight,
+                                                  child: IconButton(
+                                                    icon: const Icon(Icons.close, color: Colors.black54),
+                                                    onPressed: () => Navigator.of(context).pop(),
+                                                    padding: EdgeInsets.zero,
+                                                    constraints: const BoxConstraints(),
                                                   ),
                                                 ),
-                                              const SizedBox(height: 16),
-                                              Text(
-                                                "Title: ${blog['title'] ?? 'N/A'}",
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text("Category: ${blog['category'] ?? 'N/A'}"),
-                                              Text("Status: ${blog['blog_status'] ?? 'N/A'}"),
-                                              Text("Date: ${formatDate(blog['created_at'] ?? '')}"),
-                                              const SizedBox(height: 8),
-                                              Text("Author: ${blog['author'] ?? 'N/A'}"),
-                                              const SizedBox(height: 8),
-                                              const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
-                                              const SizedBox(height: 4),
-                                              const SizedBox(height: 8),
-                                              HtmlWidget(
-                                                blog['content'] ?? 'No content.',
-                                                baseUrl: Uri.parse('http://10.0.2.2/tara-kabataan/'),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed:
-                                                () =>
-                                                    Navigator.of(context).pop(),
-                                            child: const Text("Close"),
+                                                
+                                                // Image
+                                                if (blog['image_url'] != null && blog['image_url'].toString().isNotEmpty)
+                                                  ClipRRect(
+                                                    borderRadius: BorderRadius.circular(12),
+                                                    child: Image.network(
+                                                      'http://10.0.2.2/tara-kabataan/tara-kabataan-webapp/uploads/blogs-images/${blog['image_url']}',
+                                                      height: 180,
+                                                      width: double.infinity,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context, error, stackTrace) {
+                                                        return Container(
+                                                          height: 180,
+                                                          width: double.infinity,
+                                                          color: Colors.grey[300],
+                                                          child: const Center(child: Text('Image not available')),
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                                const SizedBox(height: 16),
+                                                
+                                                // Title
+                                                Text(
+                                                  "Title: ${blog['title'] ?? 'N/A'}",
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                
+                                                // Metadata
+                                                Text(
+                                                  "Category: ${blog['category'] ?? 'N/A'}",
+                                                  style: const TextStyle(fontSize: 14),
+                                                ),
+                                                Text(
+                                                  "Status: ${blog['blog_status'] ?? 'N/A'}",
+                                                  style: const TextStyle(fontSize: 14),
+                                                ),
+                                                Text(
+                                                  "Date: ${formatDate(blog['created_at'] ?? '')}",
+                                                  style: const TextStyle(fontSize: 14),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                
+                                                // Content section
+                                                const Text(
+                                                  "Content:",
+                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                ConstrainedBox(
+                                                  constraints: const BoxConstraints(maxHeight: 300),
+                                                  child: SingleChildScrollView(
+                                                    child: HtmlWidget(
+                                                      blog['content'] ?? 'No content.',
+                                                      baseUrl: Uri.parse('http://10.0.2.2/tara-kabataan/'),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 20),
+                                                
+                                                // Action buttons
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    ElevatedButton.icon(
+                                                      onPressed: () async {
+                                                        // Delete functionality
+                                                        final confirm = await showDialog<bool>(
+                                                          context: context,
+                                                          builder: (context) => AlertDialog(
+                                                            title: const Text("Delete Blog"),
+                                                            content: const Text("Are you sure you want to delete this blog?"),
+                                                            actions: [
+                                                              TextButton(
+                                                                onPressed: () => Navigator.of(context).pop(false),
+                                                                child: const Text("Cancel"),
+                                                              ),
+                                                              TextButton(
+                                                                onPressed: () => Navigator.of(context).pop(true),
+                                                                child: const Text("Delete", style: TextStyle(color: Colors.red)),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ) ?? false;
+
+                                                        if (confirm) {
+                                                          Navigator.of(context).pop(); // Close the blog details dialog
+                                                          final success = await _deleteBlog(blog['id']);
+                                                          if (success) {
+                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                              const SnackBar(content: Text('Blog deleted successfully')),
+                                                            );
+                                                          }
+                                                        }
+                                                      },
+                                                      icon: const Icon(Icons.delete, color: Colors.white),
+                                                      label: const Text('Delete', style: TextStyle(color: Colors.white)),
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor: Colors.red[400],
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 16),
+                                                    ElevatedButton.icon(
+                                                      onPressed: () {
+                                                        // Edit functionality
+                                                        Navigator.of(context).pop();
+                                                      },
+                                                      icon: const Icon(Icons.edit, color: Colors.white),
+                                                      label: const Text('Edit', style: TextStyle(color: Colors.white)),
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor: Colors.blue[400],
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ],
-                                      );
-                                    },
-                                  );
+                                      ),
+                                    );
+                                  },
+                                );
+                              }
+                              
+                              return DataRow(
+                                // Enable row selection for showing dialog
+                                onSelectChanged: (value) {
+                                  if (value == true) {
+                                    showBlogDetailsDialog();
+                                  }
                                 },
                                 cells: [
+                                  // Checkbox cell - separate functionality
+                                  DataCell(
+                                    Checkbox(
+                                      value: selectedRows[index] ?? false,
+                                      onChanged: (bool? value) {
+                                        setState(() {
+                                          selectedRows[index] = value ?? false;
+                                        });
+                                      },
+                                    ),
+                                    // Empty onTap to prevent row selection when clicking the checkbox
+                                    onTap: () {},
+                                  ),
+                                  // Category cell
                                   DataCell(
                                     SizedBox(
                                       width: 60,
@@ -388,6 +655,7 @@ class BlogsPage extends StatelessWidget {
                                       ),
                                     ),
                                   ),
+                                  // Title cell
                                   DataCell(
                                     SizedBox(
                                       width: 80,
@@ -398,6 +666,7 @@ class BlogsPage extends StatelessWidget {
                                       ),
                                     ),
                                   ),
+                                  // Status cell
                                   DataCell(
                                     SizedBox(
                                       width: 60,
@@ -408,6 +677,7 @@ class BlogsPage extends StatelessWidget {
                                       ),
                                     ),
                                   ),
+                                  // Date cell
                                   DataCell(
                                     SizedBox(
                                       width: 60,
@@ -423,6 +693,12 @@ class BlogsPage extends StatelessWidget {
                             }).toList(),
                       ),
                     ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                   );
                 },
               ),
@@ -434,14 +710,17 @@ class BlogsPage extends StatelessWidget {
   }
 }
 
-Widget _pillButton({required Widget child}) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(10),
+Widget _pillButton({required Widget child, VoidCallback? onTap}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: child,
     ),
-    child: child,
   );
 }
 
