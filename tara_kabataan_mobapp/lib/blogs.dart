@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'events.dart';
-import 'settings.dart';
+import 'settings/settings.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
