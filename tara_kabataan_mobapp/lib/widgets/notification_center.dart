@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'notification_service.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+
 
 class NotificationCenter extends StatelessWidget {
-  const NotificationCenter({Key? key}) : super(key: key);
+  const NotificationCenter({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -139,40 +141,44 @@ class NotificationCenter extends StatelessWidget {
 class NotificationItem extends StatelessWidget {
   final EventNotification notification;
 
-  const NotificationItem({Key? key, required this.notification}) : super(key: key);
+  const NotificationItem({super.key, required this.notification});
 
   @override
   Widget build(BuildContext context) {
     final notificationManager = Provider.of<NotificationManager>(context, listen: false);
 
-    return Dismissible(
-      key: Key(notification.id),
-      background: Container(
-        color: Colors.green,
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: 20),
-        child: const Icon(Icons.done, color: Colors.white),
-      ),
-      secondaryBackground: Container(
-        color: Colors.red,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      direction: DismissDirection.horizontal,
-      onDismissed: (direction) {
-        if (direction == DismissDirection.startToEnd) {
-          notificationManager.markAsRead(notification.id);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Notification marked as read')),
-          );
-        } else if (direction == DismissDirection.endToStart) {
-          notificationManager.deleteNotification(notification.id);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Notification deleted')),
-          );
-        }
-      },
+return Dismissible(
+  key: Key(notification.id),
+  direction: notification.isRead
+      ? DismissDirection.endToStart // Only allow swipe left to delete
+      : DismissDirection.horizontal, // Allow both swipe directions
+  background: notification.isRead
+      ? const SizedBox() // No "mark as read" UI
+      : Container(
+          color: Colors.green,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 20),
+          child: const Icon(Icons.done, color: Colors.white),
+        ),
+  secondaryBackground: Container(
+    color: Colors.red,
+    alignment: Alignment.centerRight,
+    padding: const EdgeInsets.only(right: 20),
+    child: const Icon(Icons.delete, color: Colors.white),
+  ),
+ onDismissed: (direction) {
+  if (direction == DismissDirection.startToEnd && !notification.isRead) {
+    notificationManager.markAsReadAndMoveToBottom(notification.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Notification marked as read')),
+    );
+  } else if (direction == DismissDirection.endToStart) {
+    notificationManager.deleteNotification(notification.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Notification deleted')),
+    );
+  }
+},
       child: Material(
         color: Colors.transparent,
         child: InkWell(

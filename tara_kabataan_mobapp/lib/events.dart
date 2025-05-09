@@ -65,9 +65,9 @@ import 'widgets/notification_center.dart';
 		bool _isLoading = true;
 		String _searchQuery = '';
 		bool _isSelecting = false;
-		Set<String> _selectedEventIds = {};
+		final Set<String> _selectedEventIds = {};
 		int _currentPage = 1;
-		int _itemsPerPage = 10;
+		final int _itemsPerPage = 10;
 		int _totalPages = 1;
 
 		@override
@@ -241,7 +241,7 @@ import 'widgets/notification_center.dart';
 								],
 							),
 						),
-						Container(
+						SizedBox(
   width: double.infinity,
 					child: SingleChildScrollView(
 						scrollDirection: Axis.horizontal,
@@ -253,7 +253,7 @@ import 'widgets/notification_center.dart';
 							dividerThickness: 0,
 							showCheckboxColumn: _isSelecting,
 							headingRowColor: WidgetStateProperty.all(Colors.transparent),
-							border: TableBorder(
+							border: const TableBorder(
 								horizontalInside: BorderSide.none,
 								top: BorderSide.none,
 								bottom: BorderSide.none,
@@ -556,8 +556,8 @@ if (events.isNotEmpty)
                     ? Container(
                         width: 32,
                         height: 32,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF5A89),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF5A89),
                           shape: BoxShape.circle,
                         ),
                         child: Center(
@@ -591,8 +591,8 @@ if (events.isNotEmpty)
                 )
               else if ((i == 2 && _currentPage > 3) || 
                        (i == _totalPages - 1 && _currentPage < _totalPages - 2))
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
                   child: Text('...', style: TextStyle(fontSize: 16)),
                 ),
             const SizedBox(width: 8),
@@ -647,7 +647,7 @@ Widget build(BuildContext context) {
               height: 45,
               child: TextField(
                 controller: _searchController,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText: 'Search',
                   hintStyle: TextStyle(color: Colors.grey),
                   border: InputBorder.none,
@@ -776,10 +776,10 @@ Widget build(BuildContext context) {
 										),
 									),
 								),
-								Padding(
-									padding: const EdgeInsets.only(left: 24, bottom: 30),
+								const Padding(
+									padding: EdgeInsets.only(left: 24, bottom: 30),
 									child: Row(
-										children: const [
+										children: [
 											Icon(Icons.logout, color: Colors.white),
 											SizedBox(width: 8),
 											Text(
@@ -876,7 +876,7 @@ Widget build(BuildContext context) {
 						onRefresh: _loadEvents,
 						child: _filteredEvents.isEmpty
 								?  ListView(
-										children: [Center(child: Padding(
+										children: const [Center(child: Padding(
 											padding: EdgeInsets.only(top: 100),
 											child: Text('No events found.'),
 										))],
@@ -972,7 +972,7 @@ Widget build(BuildContext context) {
 	Future<void> openMapPicker(BuildContext context, TextEditingController venueController) async {
 		final LatLng? pickedLocation = await Navigator.push(
 			context,
-			MaterialPageRoute(builder: (context) => MapPickerScreen()),
+			MaterialPageRoute(builder: (context) => const MapPickerScreen()),
 		);
 
 		if (pickedLocation != null) {
@@ -1241,16 +1241,16 @@ Widget build(BuildContext context) {
 																					});
 																				}
 																			},
-																			decoration: InputDecoration(
+																			decoration: const InputDecoration(
 																				filled: true,
 																				fillColor: Colors.white,
 																				border: InputBorder.none,
 																				isDense: true,
 																				contentPadding:
-																						const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+																						EdgeInsets.symmetric(horizontal: 12, vertical: 8),
 																				suffixIcon:
-																						const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-																				suffixIconConstraints: const BoxConstraints(
+																						Icon(Icons.calendar_today, size: 15, color: Colors.grey),
+																				suffixIconConstraints: BoxConstraints(
 																						minHeight: 24, minWidth: 24, maxHeight: 24, maxWidth: 24),
 																			),
 																		),
@@ -1463,7 +1463,7 @@ Container(
       hint: 'Enter your content here...',
       initialText: contentController.text,
     ),
-    htmlToolbarOptions: HtmlToolbarOptions(
+    htmlToolbarOptions: const HtmlToolbarOptions(
       toolbarPosition: ToolbarPosition.aboveEditor,
       toolbarType: ToolbarType.nativeScrollable,
       defaultToolbarButtons: [

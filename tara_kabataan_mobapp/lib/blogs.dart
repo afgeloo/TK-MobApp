@@ -140,10 +140,10 @@ class BlogsPage extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 24, bottom: 30),
+              const Padding(
+                padding: EdgeInsets.only(left: 24, bottom: 30),
                 child: Row(
-                  children: const [
+                  children: [
                     Icon(Icons.logout, color: Colors.white),
                     SizedBox(width: 8),
                     Text(
@@ -264,7 +264,7 @@ class BlogsPage extends StatelessWidget {
                         headingRowColor: WidgetStateProperty.all(
                           Colors.transparent,
                         ),
-                        border: TableBorder(
+                        border: const TableBorder(
                           horizontalInside: BorderSide.none,
                           top: BorderSide.none,
                           bottom: BorderSide.none,

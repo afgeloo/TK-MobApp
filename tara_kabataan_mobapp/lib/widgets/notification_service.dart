@@ -57,6 +57,48 @@ class NotificationManager extends ChangeNotifier {
   Future<void> initialize() async {
     await _loadNotifications();
   }
+EventNotification? markAsReadAndRemove(String id) {
+  final index = _notifications.indexWhere((n) => n.id == id);
+  if (index != -1) {
+    final item = _notifications.removeAt(index);
+    final updated = EventNotification(
+      id: item.id,
+      title: item.title,
+      message: item.message,
+      timestamp: item.timestamp,
+      isRead: true,
+    );
+    _notifications.add(updated);
+    _saveNotifications();
+    notifyListeners();
+    return updated;
+  }
+  return null;
+}
+
+void markAsReadAndMoveToBottom(String id) {
+  final index = _notifications.indexWhere((n) => n.id == id);
+  if (index != -1) {
+    final item = _notifications.removeAt(index);
+
+    final updated = EventNotification(
+      id: item.id,
+      title: item.title,
+      message: item.message,
+      timestamp: item.timestamp,
+      isRead: true,
+    );
+
+    _notifications.add(updated); // 👈 Add at the bottom
+    _saveNotifications();
+    notifyListeners();
+  }
+}
+
+
+
+
+
 
   // Add a new notification
   void addNotification(String title, String message) {

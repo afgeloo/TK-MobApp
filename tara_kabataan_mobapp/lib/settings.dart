@@ -114,10 +114,10 @@ class SettingsPage extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 24, bottom: 30),
+              const Padding(
+                padding: EdgeInsets.only(left: 24, bottom: 30),
                 child: Row(
-                  children: const [
+                  children: [
                     Icon(Icons.logout, color: Colors.white),
                     SizedBox(width: 8),
                     Text(
