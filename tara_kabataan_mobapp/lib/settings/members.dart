@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:dotted_border/dotted_border.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'edit_member_dialog.dart';
+
 
 class MembersTab extends StatefulWidget {
   const MembersTab({super.key});
@@ -59,23 +62,28 @@ class _MembersTabState extends State<MembersTab> {
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.grey[200],
-              backgroundImage: NetworkImage('http://10.0.2.2${member['member_image']}'),
+            CachedNetworkImage(
+              imageUrl: 'http://10.0.2.2/tara-kabataan${member['member_image']}',
+              imageBuilder: (context, imageProvider) => CircleAvatar(
+                radius: 50,
+                backgroundImage: imageProvider,
+              ),
+              placeholder: (context, url) => const CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.grey,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              errorWidget: (context, url, error) => const CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.grey,
+                child: Icon(Icons.broken_image, size: 30),
+              ),
             ),
             const SizedBox(height: 16),
-            Text(
-              member['member_name'],
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            Text(member['member_name'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(
-              member['role_name'],
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
-            ),
+            Text(member['role_name'], style: const TextStyle(fontSize: 14, color: Colors.grey)),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -167,7 +175,7 @@ class _MembersTabState extends State<MembersTab> {
                     ...members.map((member) => _MemberCard(
                           name: member['member_name'],
                           role: member['role_name'],
-                          imageUrl: 'http://10.0.2.2${member['member_image']}',
+                          imageUrl: 'http://10.0.2.2/tara-kabataan${member['member_image']}',
                           onTap: () => _showMemberDialog(member),
                           width: itemWidth,
                         )),
@@ -232,23 +240,9 @@ class _MemberCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 4),
-                        Text(
-                          role,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(role, style: const TextStyle(fontSize: 13, color: Colors.grey), overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),
@@ -262,24 +256,19 @@ class _MemberCard extends StatelessWidget {
                 padding: const EdgeInsets.all(3),
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFFF5A89), Color(0xFF4DB1E3)],
-                  ),
+                  gradient: LinearGradient(colors: [Color(0xFFFF5A89), Color(0xFF4DB1E3)]),
                 ),
                 child: CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
                   child: ClipOval(
-                    child: Image.network(
-                      imageUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
                       width: 54,
                       height: 54,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
-                        Icons.broken_image,
-                        size: 30,
-                        color: Colors.grey,
-                      ),
+                      placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      errorWidget: (context, url, error) => const Icon(Icons.broken_image, size: 30, color: Colors.grey),
                     ),
                   ),
                 ),
@@ -328,5 +317,7 @@ class _AddMemberTile extends StatelessWidget {
         ),
       ),
     );
+
+    
   }
 }

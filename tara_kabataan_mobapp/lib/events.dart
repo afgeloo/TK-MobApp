@@ -208,432 +208,254 @@ class _EventsPageState extends State<EventsPage> {
   }
 
   Widget _buildEventDetailDialog(Map<String, dynamic> event) {
-                                          return Dialog(
-                                            backgroundColor: const Color(
-                                              0xFFFFF6F6,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            insetPadding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                ), // same as edit modal
-                                            child: SizedBox(
-                                              width:
-                                                  MediaQuery.of(
-                                                    context,
-                                                  ).size.width,
-                                              height:
-                                                  MediaQuery.of(
-                                                    context,
-                                                  ).size.height,
-                                              child: ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                                child: SingleChildScrollView(
-                                                  child: Padding(
-                                                    padding:
-                                                        const EdgeInsets.all(
-                                                          24,
-                                                        ),
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Row(
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .spaceBetween,
-                                                          children: [
-                                                            const Text(
-                                                              'EVENT DETAILS',
-                                                              style: TextStyle(
-                                                                fontFamily:
-                                                                    'Bogart',
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w900,
-                                                                fontSize: 24,
-                                                                color: Color(
-                                                                  0xFF3D3D3D,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IconButton(
-                                                              icon: const Icon(
-                                                                Icons.close,
-                                                                color:
-                                                                    Colors
-                                                                        .black54,
-                                                              ),
-                                                              onPressed:
-                                                                  () =>
-                                                                      Navigator.of(
-                                                                        context,
-                                                                      ).pop(),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        const SizedBox(
-                                                          height: 20,
-                                                        ),
-                                                        // Image
-                                                        if (event['image_url'] !=
-                                                                null &&
-                                                            event['image_url']
-                                                                .toString()
-                                                                .isNotEmpty)
-                                                          ClipRRect(
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  12,
-                                                                ),
-                                                            child: Image.network(
-                                                              'http://10.0.2.2${event['image_url']}',
-                                                              width:
-                                                                  double
-                                                                      .infinity,
-                                                              height: 200,
-                                                              fit: BoxFit.cover,
-                                                            ),
-                                                          )
-                                                        else
-                                                          Container(
-                                                            height: 200,
-                                                            width:
-                                                                double.infinity,
-                                                            decoration: BoxDecoration(
-                                                              color:
-                                                                  Colors
-                                                                      .grey[200],
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    12,
-                                                                  ),
-                                                            ),
-                                                            child: const Icon(
-                                                              Icons
-                                                                  .image_not_supported,
-                                                              size: 60,
-                                                              color:
-                                                                  Colors.grey,
-                                                            ),
-                                                          ),
+    return Dialog(
+      backgroundColor: const Color(0xFFFFF6F6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 10,
+      ), // same as edit modal
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'EVENT DETAILS',
+                        style: TextStyle(
+                          fontFamily: 'Bogart',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 24,
+                          color: Color(0xFF3D3D3D),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.black54),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Image
+                  if (event['image_url'] != null &&
+                      event['image_url'].toString().isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        'http://10.0.2.2${event['image_url']}',
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  else
+                    Container(
+                      height: 200,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
+                    ),
 
-                                                        const SizedBox(
-                                                          height: 16,
-                                                        ),
+                  const SizedBox(height: 16),
 
-                                                        // Title
-                                                        Text(
-                                                          event['title'] ??
-                                                              'Untitled',
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 20,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                color: Color(
-                                                                  0xFF3D3D3D,
-                                                                ),
-                                                              ),
-                                                        ),
+                  // Title
+                  Text(
+                    event['title'] ?? 'Untitled',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3D3D3D),
+                    ),
+                  ),
 
-                                                        const SizedBox(
-                                                          height: 8,
-                                                        ),
+                  const SizedBox(height: 8),
 
-                                                        // Event details
-                                                        Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            Wrap(
-                                                              runSpacing: 4,
-                                                              children: [
-                                                                Text(
-                                                                  "📅 ${formatDate(event['event_date'] ?? '')} | ",
-                                                                ),
-                                                                Text(
-                                                                  "🕓 ${_formatTime(event['event_start_time'])} – ${_formatTime(event['event_end_time'])}",
-                                                                ),
-                                                              ],
-                                                            ),
-                                                            Text(
-                                                              "🎯 ${event['category']} | ${event['event_status']}",
-                                                            ),
-                                                            Text(
-                                                              "🗣️ ${event['event_speakers'] ?? 'N/A'}",
-                                                            ),
-                                                            Text(
-                                                              "📍 ${event['event_venue'] ?? 'N/A'}",
-                                                            ),
-                                                          ],
-                                                        ),
+                  // Event details
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        runSpacing: 4,
+                        children: [
+                          Text(
+                            "📅 ${formatDate(event['event_date'] ?? '')} | ",
+                          ),
+                          Text(
+                            "🕓 ${_formatTime(event['event_start_time'])} – ${_formatTime(event['event_end_time'])}",
+                          ),
+                        ],
+                      ),
+                      Text(
+                        "🎯 ${event['category']} | ${event['event_status']}",
+                      ),
+                      Text("🗣️ ${event['event_speakers'] ?? 'N/A'}"),
+                      Text("📍 ${event['event_venue'] ?? 'N/A'}"),
+                    ],
+                  ),
 
-                                                        const SizedBox(
-                                                          height: 16,
-                                                        ),
+                  const SizedBox(height: 16),
 
-                                                        // Map
-                                                        if ((event['event_venue'] ??
-                                                                '')
-                                                            .toString()
-                                                            .isNotEmpty)
-                                                          EmbedGoogleMapWidget(
-                                                            address:
-                                                                event['event_venue'] ??
-                                                                '',
-                                                          ),
+                  // Map
+                  if ((event['event_venue'] ?? '').toString().isNotEmpty)
+                    EmbedGoogleMapWidget(address: event['event_venue'] ?? ''),
 
-                                                        const SizedBox(
-                                                          height: 20,
-                                                        ),
+                  const SizedBox(height: 20),
 
-                                                        // Content
-                                                        const Text(
-                                                          "Content",
-                                                          style: TextStyle(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                          height: 6,
-                                                        ),
-                                                        Container(
-                                                          constraints:
-                                                              const BoxConstraints(
-                                                                maxHeight: 300,
-                                                              ),
-                                                          padding:
-                                                              const EdgeInsets.all(
-                                                                8,
-                                                              ),
-                                                          decoration: BoxDecoration(
-                                                            color: Colors.white,
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  8,
-                                                                ),
-                                                          ),
-                                                          child: Scrollbar(
-                                                            thumbVisibility:
-                                                                true,
-                                                            child: SingleChildScrollView(
-                                                              child: HtmlWidget(
-                                                                (event['content'] ??
-                                                                        'No content.')
-                                                                    .replaceAll(
-                                                                      'http://localhost/',
-                                                                      'http://10.0.2.2/',
-                                                                    ),
-                                                                baseUrl: Uri.parse(
-                                                                  'http://10.0.2.2/',
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ),
+                  // Content
+                  const Text(
+                    "Content",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Scrollbar(
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        child: HtmlWidget(
+                          (event['content'] ?? 'No content.').replaceAll(
+                            'http://localhost/',
+                            'http://10.0.2.2/',
+                          ),
+                          baseUrl: Uri.parse('http://10.0.2.2/'),
+                        ),
+                      ),
+                    ),
+                  ),
 
-                                                        const SizedBox(
-                                                          height: 24,
-                                                        ),
+                  const SizedBox(height: 24),
 
-                                                        // Action buttons
-                                                        Row(
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .end,
-                                                          children: [
-                                                            TextButton.icon(
-                                                              onPressed: () async {
-                                                                final confirm = await showDialog<
-                                                                  bool
-                                                                >(
-                                                                  context:
-                                                                      context,
-                                                                  builder:
-                                                                      (
-                                                                        context,
-                                                                      ) => AlertDialog(
-                                                                        title: const Text(
-                                                                          "Delete Event",
-                                                                        ),
-                                                                        content:
-                                                                            const Text(
-                                                                              "Are you sure you want to delete this event?",
-                                                                            ),
-                                                                        actions: [
-                                                                          TextButton(
-                                                                            onPressed:
-                                                                                () => Navigator.pop(
-                                                                                  context,
-                                                                                  false,
-                                                                                ),
-                                                                            child: const Text(
-                                                                              "Cancel",
-                                                                            ),
-                                                                          ),
-                                                                          TextButton(
-                                                                            onPressed:
-                                                                                () => Navigator.pop(
-                                                                                  context,
-                                                                                  true,
-                                                                                ),
-                                                                            child: const Text(
-                                                                              "Delete",
-                                                                            ),
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                );
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder:
+                                (context) => AlertDialog(
+                                  title: const Text("Delete Event"),
+                                  content: const Text(
+                                    "Are you sure you want to delete this event?",
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed:
+                                          () => Navigator.pop(context, false),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed:
+                                          () => Navigator.pop(context, true),
+                                      child: const Text("Delete"),
+                                    ),
+                                  ],
+                                ),
+                          );
 
-                                                                if (confirm ==
-                                                                    true) {
-                                                                  final deleteResponse = await http.post(
-                                                                    Uri.parse(
-                                                                      'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_event.php',
-                                                                    ),
-                                                                    headers: {
-                                                                      'Content-Type':
-                                                                          'application/json',
-                                                                    },
-                                                                    body: jsonEncode({
-                                                                      "event_id":
-                                                                          event['event_id'],
-                                                                    }),
-                                                                  );
-                                                                  final result =
-                                                                      jsonDecode(
-                                                                        deleteResponse
-                                                                            .body,
-                                                                      );
-                                                                  if (result['success']) {
-                                                                    Navigator.of(
-                                                                      context,
-                                                                    ).pop();
-                                                                    ScaffoldMessenger.of(
-                                                                      context,
-                                                                    ).showSnackBar(
-                                                                      const SnackBar(
-                                                                        content:
-                                                                            Text(
-                                                                              "Event deleted successfully.",
-                                                                            ),
-                                                                      ),
-                                                                    );
-                                                                    final notificationManager = Provider.of<
-                                                                      NotificationManager
-                                                                    >(
-                                                                      context,
-                                                                      listen:
-                                                                          false,
-                                                                    );
-                                                                    notificationManager.addNotification(
-                                                                      "Event Deleted",
-                                                                      "The event '${event['title']}' was deleted successfully",
-                                                                    );
-                                                                    _loadEvents();
-                                                                  } else {
-                                                                    ScaffoldMessenger.of(
-                                                                      context,
-                                                                    ).showSnackBar(
-                                                                      SnackBar(
-                                                                        content:
-                                                                            Text(
-                                                                              "Failed to delete: ${result['error']}",
-                                                                            ),
-                                                                      ),
-                                                                    );
-                                                                  }
-                                                                }
-                                                              },
-                                                              icon: const Icon(
-                                                                Icons.delete,
-                                                                color:
-                                                                    Colors
-                                                                        .white,
-                                                              ),
-                                                              label: const Text(
-                                                                "Delete",
-                                                                style: TextStyle(
-                                                                  color:
-                                                                      Colors
-                                                                          .white,
-                                                                ),
-                                                              ),
-                                                              style: TextButton.styleFrom(
-                                                                backgroundColor:
-                                                                    const Color(
-                                                                      0xFFE94B4B,
-                                                                    ),
-                                                                padding:
-                                                                    const EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          20,
-                                                                      vertical:
-                                                                          12,
-                                                                    ),
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 12,
-                                                            ),
-                                                            TextButton.icon(
-                                                              onPressed: () {
-                                                                Navigator.of(
-                                                                  context,
-                                                                ).pop();
-                                                                showEventDialog(
-                                                                  context,
-                                                                  isEdit: true,
-                                                                  eventData:
-                                                                      event,
-                                                                );
-                                                              },
-                                                              icon: const Icon(
-                                                                Icons.edit,
-                                                                color:
-                                                                    Colors
-                                                                        .white,
-                                                              ),
-                                                              label: const Text(
-                                                                "Edit",
-                                                                style: TextStyle(
-                                                                  color:
-                                                                      Colors
-                                                                          .white,
-                                                                ),
-                                                              ),
-                                                              style: TextButton.styleFrom(
-                                                                backgroundColor:
-                                                                    const Color(
-                                                                      0xFF4DB1E3,
-                                                                    ),
-                                                                padding:
-                                                                    const EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          20,
-                                                                      vertical:
-                                                                          12,
-                                                                    ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          );
+                          if (confirm == true) {
+                            final deleteResponse = await http.post(
+                              Uri.parse(
+                                'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_event.php',
+                              ),
+                              headers: {'Content-Type': 'application/json'},
+                              body: jsonEncode({"event_id": event['event_id']}),
+                            );
+                            final result = jsonDecode(deleteResponse.body);
+                            if (result['success']) {
+                              Navigator.of(context).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Event deleted successfully."),
+                                ),
+                              );
+                              final notificationManager =
+                                  Provider.of<NotificationManager>(
+                                    context,
+                                    listen: false,
+                                  );
+                              notificationManager.addNotification(
+                                "Event Deleted",
+                                "The event '${event['title']}' was deleted successfully",
+                              );
+                              _loadEvents();
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    "Failed to delete: ${result['error']}",
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.delete, color: Colors.white),
+                        label: const Text(
+                          "Delete",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFE94B4B),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          showEventDialog(
+                            context,
+                            isEdit: true,
+                            eventData: event,
+                          );
+                        },
+                        icon: const Icon(Icons.edit, color: Colors.white),
+                        label: const Text(
+                          "Edit",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFF4DB1E3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildEventTable(List<Map<String, dynamic>> events) {
@@ -770,7 +592,9 @@ class _EventsPageState extends State<EventsPage> {
                             showDialog(
                               context: context,
                               builder: (context) {
-                                return _buildEventDetailDialog(event); // move dialog logic into helper
+                                return _buildEventDetailDialog(
+                                  event,
+                                ); // move dialog logic into helper
                               },
                             );
                           }
