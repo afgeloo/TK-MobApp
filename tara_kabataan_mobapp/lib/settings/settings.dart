@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
-import 'blogs.dart';
-import 'events.dart';
+import '../blogs.dart';
+import '../events.dart';
+import 'about_us.dart';
+import 'members.dart';
+import 'partnerships.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  int _selectedIndex = 0;
+  final List<String> _tabs = ['About Us', 'Members', 'Partnerships'];
 
   void _navigateTo(BuildContext context, Widget page) {
     Navigator.pop(context);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => page),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (context) => page));
   }
 
   @override
@@ -21,9 +29,7 @@ class SettingsPage extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         toolbarHeight: 70,
-        iconTheme: const IconThemeData(
-          color: Color(0xFFFF5A89), 
-        ),
+        iconTheme: const IconThemeData(color: Color(0xFFFF5A89)),
         title: Row(
           children: [
             Expanded(
@@ -44,14 +50,12 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-
             const CircleAvatar(
               radius: 20,
               backgroundColor: Colors.black54,
               child: Icon(Icons.person, color: Colors.white, size: 25),
             ),
             const SizedBox(width: 15),
-
             Stack(
               children: [
                 const Icon(Icons.notifications_none, color: Colors.black87, size: 35),
@@ -73,7 +77,7 @@ class SettingsPage extends StatelessWidget {
         ),
       ),
       drawer: Drawer(
-        backgroundColor: const Color(0xFFFF9DB9), 
+        backgroundColor: const Color(0xFFFF9DB9),
         child: SafeArea(
           child: Column(
             children: [
@@ -106,18 +110,16 @@ class SettingsPage extends StatelessWidget {
                       _SidebarButton(
                         icon: Icons.settings_outlined,
                         label: 'Settings',
-                        onTap: () {
-                          Navigator.pop(context);
-                        },
+                        onTap: () => Navigator.pop(context),
                       ),
                     ],
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 24, bottom: 30),
+              const Padding(
+                padding: EdgeInsets.only(left: 24, bottom: 30),
                 child: Row(
-                  children: const [
+                  children: [
                     Icon(Icons.logout, color: Colors.white),
                     SizedBox(width: 8),
                     Text(
@@ -136,11 +138,65 @@ class SettingsPage extends StatelessWidget {
           ),
         ),
       ),
-      body: const Center(
-        child: Text(
-          'Welcome to Settings Page!',
-          style: TextStyle(fontSize: 24),
-        ),
+      body: Column(
+        children: [
+          const SizedBox(height: 20),
+
+          // Top Segmented Tab Bar
+          Container(
+            padding: const EdgeInsets.all(4),
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF6F6F6),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Row(
+              children: List.generate(_tabs.length, (index) {
+                final isSelected = _selectedIndex == index;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedIndex = index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFFFEEF3) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(25),
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFFFF5A89) : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          _tabs[index],
+                          style: TextStyle(
+                            color: isSelected ? const Color(0xFFFF5A89) : Colors.grey.shade700,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Tab Content View
+          Expanded(
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: const [
+                AboutUsTab(),
+                MembersTab(),
+                PartnershipsTab(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -160,10 +216,10 @@ class _SidebarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent, 
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14), 
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           child: Row(
