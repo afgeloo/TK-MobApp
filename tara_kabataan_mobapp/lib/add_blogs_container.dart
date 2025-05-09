@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:async/async.dart';
+import 'package:html_editor_enhanced/html_editor.dart';
 
 class AddBlogDialog extends StatefulWidget {
   final Function onBlogAdded; // Callback to refresh blog list
@@ -19,6 +20,7 @@ class _AddBlogDialogState extends State<AddBlogDialog> {
   final titleController = TextEditingController();
   final authorController = TextEditingController();
   final contentController = TextEditingController();
+  final htmlEditorController = HtmlEditorController();
   String? selectedCategory;
   String? selectedStatus;
   String? imageUrl;
@@ -148,13 +150,13 @@ class _AddBlogDialogState extends State<AddBlogDialog> {
                         child: Image.network(imageUrl!, fit: BoxFit.cover),
                       )
                     : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.image, size: 50, color: Colors.grey),
-                        SizedBox(height: 10),
-                        Text('insert image', style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.image, size: 50, color: Colors.grey),
+                          SizedBox(height: 10),
+                          Text('Insert image', style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
               ),
               const SizedBox(height: 10),
               Row(
@@ -169,7 +171,6 @@ class _AddBlogDialogState extends State<AddBlogDialog> {
                       if (pickedImage != null) {
                         setState(() {
                           imageFile = File(pickedImage.path);
-                          // Display local image preview
                         });
                       }
                     },
@@ -282,22 +283,48 @@ class _AddBlogDialogState extends State<AddBlogDialog> {
               // Content field
               const Text('Content', style: TextStyle(fontWeight: FontWeight.w500)),
               const SizedBox(height: 5),
-              TextField(
-                controller: contentController,
-                maxLines: 8,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
+              Container(
+                height: 300,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: HtmlEditor(
+                  controller: htmlEditorController,
+                  htmlEditorOptions: const HtmlEditorOptions(
+                    hint: 'Enter your content here...',
+                    shouldEnsureVisible: true,
+                  ),
+                  htmlToolbarOptions: const HtmlToolbarOptions(
+                    toolbarPosition: ToolbarPosition.aboveEditor,
+                    toolbarType: ToolbarType.nativeScrollable,
+                    defaultToolbarButtons: [
+                      StyleButtons(), // Bold, italic, underline buttons
+                      FontButtons(), // Font formatting
+                      ListButtons(), // Bullet and numbered lists
+                      InsertButtons(picture: true), // Image upload
+                    ],
+                  ),
+                  callbacks: Callbacks(
+                    onInit: () {
+                      // Set initial text if needed
+                      if (contentController.text.isNotEmpty) {
+                        htmlEditorController.setText(contentController.text);
+                      }
+                    },
+                    onChangeContent: (String? changed) {
+                      if (changed != null) {
+                        contentController.text = changed;
+                      }
+                    },
                   ),
                 ),
               ),
+              
               // Show error message if any
               if (errorMessage != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.only(top: 16),
                   child: Text(
                     errorMessage!,
                     style: const TextStyle(color: Colors.red),
@@ -311,7 +338,11 @@ class _AddBlogDialogState extends State<AddBlogDialog> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: isLoading ? null : () async {
+                  onPressed: () async {
+                    // Get the final HTML content from the editor
+                    final htmlContent = await htmlEditorController.getText();
+                    contentController.text = htmlContent;
+                    
                     // Validate form
                     if (titleController.text.isEmpty) {
                       setState(() {
@@ -396,11 +427,14 @@ class _AddBlogDialogState extends State<AddBlogDialog> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CD964),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    minimumSize: const Size(150, 20),
+                    backgroundColor: const Color.fromARGB(255, 54, 230, 139),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                     ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   child: isLoading
                     ? const SizedBox(
@@ -411,10 +445,7 @@ class _AddBlogDialogState extends State<AddBlogDialog> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text(
-                        'Add Blog',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+                    : const Text('Add Blog'),
                 ),
               ),
             ],

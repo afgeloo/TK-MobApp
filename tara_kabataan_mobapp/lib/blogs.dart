@@ -48,6 +48,7 @@ class _BlogsPageState extends State<BlogsPage> {
   int _currentPage = 1;
   int _itemsPerPage = 10;
   int _totalPages = 1;
+  TextEditingController _searchController = TextEditingController();
 
   void toggleBulkSelection() {
     setState(() {
@@ -73,6 +74,13 @@ class _BlogsPageState extends State<BlogsPage> {
   void initState() {
     super.initState();
     _loadBlogs();
+    _searchController.addListener(_searchBlogs);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   // Function to load blogs from API
@@ -109,6 +117,30 @@ class _BlogsPageState extends State<BlogsPage> {
       _currentPage = 1;
     });
     return Future.value();
+  }
+
+  // Function to search blogs based on query
+  void _searchBlogs() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredBlogs = _blogs;
+      } else {
+        _filteredBlogs = _blogs.where((blog) {
+          final title = blog['title']?.toString().toLowerCase() ?? '';
+          final category = blog['category']?.toString().toLowerCase() ?? '';
+          final content = blog['content']?.toString().toLowerCase() ?? '';
+          final status = blog['blog_status']?.toString().toLowerCase() ?? '';
+          
+          return title.contains(query) || 
+                 category.contains(query) || 
+                 content.contains(query) || 
+                 status.contains(query);
+        }).toList();
+      }
+      _totalPages = (_filteredBlogs.length / _itemsPerPage).ceil();
+      _currentPage = 1; // Reset to first page when searching
+    });
   }
 
   // Function to delete a blog
@@ -182,12 +214,15 @@ class _BlogsPageState extends State<BlogsPage> {
                   borderRadius: BorderRadius.circular(40),
                 ),
                 height: 45,
-                child: const TextField(
-                  decoration: InputDecoration(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
                     hintText: 'Search',
                     hintStyle: TextStyle(color: Colors.grey),
                     border: InputBorder.none,
+                    prefixIcon: Icon(Icons.search, color: Colors.grey),
                   ),
+                  onChanged: (_) => _searchBlogs(),
                 ),
               ),
             ),
