@@ -5,7 +5,6 @@ import 'package:dotted_border/dotted_border.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'edit_member_dialog.dart';
 
-
 class MembersTab extends StatefulWidget {
   const MembersTab({super.key});
 
@@ -110,8 +109,18 @@ class _MembersTabState extends State<MembersTab> {
   }
 
   void _editMember(Map<String, dynamic> member) {
-    Navigator.pop(context);
-    debugPrint('Open edit modal for: ${member['member_id']}');
+    Navigator.pop(context); // close the member dialog
+    showDialog(
+      context: context,
+      builder: (context) => EditMemberDialog(
+        member: member,
+        onSaved: () {
+          setState(() {
+            _membersFuture = fetchMembers(); // refresh list
+          });
+        },
+      ),
+    );
   }
 
   Future<void> _deleteMember(String memberId) async {
@@ -180,7 +189,7 @@ class _MembersTabState extends State<MembersTab> {
                           width: itemWidth,
                         )),
                     _AddMemberTile(
-                      onTap: () => debugPrint('Add Member'),
+                      onTap: () => debugPrint('Add Member'), // placeholder
                       width: itemWidth,
                     ),
                   ],
@@ -317,7 +326,5 @@ class _AddMemberTile extends StatelessWidget {
         ),
       ),
     );
-
-    
   }
 }
