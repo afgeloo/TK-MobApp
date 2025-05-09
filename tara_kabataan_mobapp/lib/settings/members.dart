@@ -15,6 +15,20 @@ class MembersTab extends StatefulWidget {
 class _MembersTabState extends State<MembersTab> {
   late Future<List<Map<String, dynamic>>> _membersFuture;
 
+  // Hardcoded roles with role_id and role_name
+  final List<Map<String, String>> _roles = [
+    {"role_id": "roles-2025-000001", "role_name": "President"},
+    {"role_id": "roles-2025-000002", "role_name": "Vice President"},
+    {"role_id": "roles-2025-000003", "role_name": "Secretary"},
+    {"role_id": "roles-2025-000004", "role_name": "Treasurer"},
+    {"role_id": "roles-2025-000005", "role_name": "Auditor"},
+    {"role_id": "roles-2025-000006", "role_name": "P.R.O"},
+    {"role_id": "roles-2025-000007", "role_name": "Committee Head"},
+    {"role_id": "roles-2025-000008", "role_name": "Committee Member"},
+    {"role_id": "roles-2025-000009", "role_name": "Council Member"},
+    {"role_id": "roles-2025-00000A", "role_name": "Adviser"},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -62,23 +76,19 @@ class _MembersTabState extends State<MembersTab> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CachedNetworkImage(
-              imageUrl: 'http://10.0.2.2/tara-kabataan${member['member_image']}',
-              imageBuilder: (context, imageProvider) => CircleAvatar(
-                radius: 50,
-                backgroundImage: imageProvider,
-              ),
-              placeholder: (context, url) => const CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              errorWidget: (context, url, error) => const CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey,
-                child: Icon(Icons.broken_image, size: 30),
-              ),
-            ),
+            // Revert to Image.network for image display
+            member['member_image'] != null && member['member_image'].isNotEmpty
+                ? Image.network(
+                    'http://10.0.2.2/tara-kabataan${member['member_image']}',
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                  )
+                : const CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey,
+                    child: Icon(Icons.broken_image, size: 30),
+                  ),
             const SizedBox(height: 16),
             Text(member['member_name'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
@@ -109,14 +119,16 @@ class _MembersTabState extends State<MembersTab> {
   }
 
   void _editMember(Map<String, dynamic> member) {
-    Navigator.pop(context); // close the member dialog
+    Navigator.pop(context); // Close the member dialog
+    
     showDialog(
       context: context,
+      barrierDismissible: false, // Prevent closing by tapping outside
       builder: (context) => EditMemberDialog(
         member: member,
         onSaved: () {
           setState(() {
-            _membersFuture = fetchMembers(); // refresh list
+            _membersFuture = fetchMembers(); // Refresh list after editing
           });
         },
       ),
