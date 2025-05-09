@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'blogs.dart';
-import 'settings.dart';
+import 'settings/settings.dart';
 import 'map_picker.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -9,12 +9,18 @@ import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart' as img_picker;
-
+import 'package:html_editor_enhanced/html_editor.dart';
+import 'widgets/google_map.dart';
+import 'package:provider/provider.dart';
+import 'widgets/notification_service.dart';
+import 'widgets/notification_center.dart';
 
 // Fetch Events Data
 Future<List<Map<String, dynamic>>> fetchEvents() async {
   final response = await http.get(
-    Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/events1.php'),
+    Uri.parse(
+      'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/events1.php',
+    ),
   );
 
   if (response.statusCode == 200) {
@@ -30,9 +36,19 @@ Future<List<Map<String, dynamic>>> fetchEvents() async {
 String formatDate(String rawDate) {
   try {
     final parsedDate = DateTime.parse(rawDate);
-    return DateFormat('MMMM d, y').format(parsedDate);
+    return DateFormat('MMM. d, y').format(parsedDate);
   } catch (_) {
     return rawDate;
+  }
+}
+
+String _formatTime(String? time) {
+  if (time == null || time.isEmpty) return '';
+  try {
+    final parsedTime = DateFormat("HH:mm").parse(time);
+    return DateFormat("h:mm a").format(parsedTime); // Example: 2:30 PM
+  } catch (_) {
+    return time; // Fallback to original if parsing fails
   }
 }
 
@@ -49,6 +65,11 @@ class _EventsPageState extends State<EventsPage> {
   List<Map<String, dynamic>> _filteredEvents = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  bool _isSelecting = false;
+  Set<String> _selectedEventIds = {};
+  int _currentPage = 1;
+  int _itemsPerPage = 10;
+  int _totalPages = 1;
 
   @override
   void initState() {
@@ -57,24 +78,26 @@ class _EventsPageState extends State<EventsPage> {
     _searchController.addListener(_onSearchChanged);
   }
 
-void _onSearchChanged() {
-  setState(() {
-    _searchQuery = _searchController.text.toLowerCase();
-
-    _filteredEvents = _allEvents.where((event) {
-      final title = event['title']?.toLowerCase() ?? '';
-      final category = event['category']?.toLowerCase() ?? '';
-      final status = event['event_status']?.toLowerCase() ?? '';
-      final rawDate = event['event_date'] ?? '';
-      final formattedDate = formatDate(rawDate).toLowerCase(); // e.g., "May 3, 2025"
-
-      return title.contains(_searchQuery) ||
-          category.contains(_searchQuery) ||
-          status.contains(_searchQuery) ||
-          formattedDate.contains(_searchQuery);
-    }).toList();
-  });
-}
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase();
+      _filteredEvents =
+          _allEvents
+              .where(
+                (event) =>
+                    event['title']?.toLowerCase().contains(_searchQuery) ==
+                        true ||
+                    event['category']?.toLowerCase().contains(_searchQuery) ==
+                        true ||
+                    event['event_status']?.toLowerCase().contains(
+                          _searchQuery,
+                        ) ==
+                        true,
+              )
+              .toList();
+      _currentPage = 1;
+    });
+  }
 
   Future<void> _loadEvents() async {
     try {
@@ -83,12 +106,15 @@ void _onSearchChanged() {
         _allEvents = events;
         _filteredEvents = events;
         _isLoading = false;
+        _currentPage = 1;
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error loading events: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error loading events: $e")));
     }
   }
 
@@ -97,7 +123,661 @@ void _onSearchChanged() {
     Navigator.push(context, MaterialPageRoute(builder: (context) => page));
   }
 
-  
+  Future<void> _deleteSelectedEvents() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("Delete Events"),
+            content: Text(
+              "Are you sure you want to delete ${_selectedEventIds.length} events?",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Cancel"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("Delete"),
+              ),
+            ],
+          ),
+    );
+
+    if (confirm == true) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      bool hasError = false;
+      String errorMessage = '';
+
+      for (final eventId in _selectedEventIds) {
+        try {
+          final deleteResponse = await http.post(
+            Uri.parse(
+              'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_event.php',
+            ),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({"event_id": eventId}),
+          );
+
+          final deleteResult = jsonDecode(deleteResponse.body);
+          if (!deleteResult['success']) {
+            hasError = true;
+            errorMessage = deleteResult['error'];
+            break;
+          }
+        } catch (e) {
+          hasError = true;
+          errorMessage = e.toString();
+          break;
+        }
+      }
+
+      // Reset selection mode
+      setState(() {
+        _isSelecting = false;
+        _selectedEventIds.clear();
+      });
+
+      // Reload events
+      await _loadEvents();
+
+      // Show appropriate message
+      if (hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error deleting events: $errorMessage")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Events deleted successfully")),
+        );
+
+        final notificationManager = Provider.of<NotificationManager>(
+          context,
+          listen: false,
+        );
+        notificationManager.addNotification(
+          "Events Deleted",
+          "Successfully deleted ${_selectedEventIds.length} events",
+        );
+      }
+    }
+  }
+
+  Widget _buildEventDetailDialog(Map<String, dynamic> event) {
+    return Dialog(
+      backgroundColor: const Color(0xFFFFF6F6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 10,
+      ), // same as edit modal
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'EVENT DETAILS',
+                        style: TextStyle(
+                          fontFamily: 'Bogart',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 24,
+                          color: Color(0xFF3D3D3D),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.black54),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Image
+                  if (event['image_url'] != null &&
+                      event['image_url'].toString().isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        'http://10.0.2.2${event['image_url']}',
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  else
+                    Container(
+                      height: 200,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // Title
+                  Text(
+                    event['title'] ?? 'Untitled',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3D3D3D),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Event details
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        runSpacing: 4,
+                        children: [
+                          Text(
+                            "📅 ${formatDate(event['event_date'] ?? '')} | ",
+                          ),
+                          Text(
+                            "🕓 ${_formatTime(event['event_start_time'])} – ${_formatTime(event['event_end_time'])}",
+                          ),
+                        ],
+                      ),
+                      Text(
+                        "🎯 ${event['category']} | ${event['event_status']}",
+                      ),
+                      Text("🗣️ ${event['event_speakers'] ?? 'N/A'}"),
+                      Text("📍 ${event['event_venue'] ?? 'N/A'}"),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Map
+                  if ((event['event_venue'] ?? '').toString().isNotEmpty)
+                    EmbedGoogleMapWidget(address: event['event_venue'] ?? ''),
+
+                  const SizedBox(height: 20),
+
+                  // Content
+                  const Text(
+                    "Content",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Scrollbar(
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        child: HtmlWidget(
+                          (event['content'] ?? 'No content.').replaceAll(
+                            'http://localhost/',
+                            'http://10.0.2.2/',
+                          ),
+                          baseUrl: Uri.parse('http://10.0.2.2/'),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder:
+                                (context) => AlertDialog(
+                                  title: const Text("Delete Event"),
+                                  content: const Text(
+                                    "Are you sure you want to delete this event?",
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed:
+                                          () => Navigator.pop(context, false),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed:
+                                          () => Navigator.pop(context, true),
+                                      child: const Text("Delete"),
+                                    ),
+                                  ],
+                                ),
+                          );
+
+                          if (confirm == true) {
+                            final deleteResponse = await http.post(
+                              Uri.parse(
+                                'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_event.php',
+                              ),
+                              headers: {'Content-Type': 'application/json'},
+                              body: jsonEncode({"event_id": event['event_id']}),
+                            );
+                            final result = jsonDecode(deleteResponse.body);
+                            if (result['success']) {
+                              Navigator.of(context).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Event deleted successfully."),
+                                ),
+                              );
+                              final notificationManager =
+                                  Provider.of<NotificationManager>(
+                                    context,
+                                    listen: false,
+                                  );
+                              notificationManager.addNotification(
+                                "Event Deleted",
+                                "The event '${event['title']}' was deleted successfully",
+                              );
+                              _loadEvents();
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    "Failed to delete: ${result['error']}",
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.delete, color: Colors.white),
+                        label: const Text(
+                          "Delete",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFE94B4B),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          showEventDialog(
+                            context,
+                            isEdit: true,
+                            eventData: event,
+                          );
+                        },
+                        icon: const Icon(Icons.edit, color: Colors.white),
+                        label: const Text(
+                          "Edit",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFF4DB1E3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEventTable(List<Map<String, dynamic>> events) {
+    _totalPages = (events.length / _itemsPerPage).ceil();
+    int startIndex = (_currentPage - 1) * _itemsPerPage;
+    int endIndex = startIndex + _itemsPerPage;
+    if (endIndex > events.length) endIndex = events.length;
+
+    final paginatedEvents =
+        events.isEmpty ? [] : events.sublist(startIndex, endIndex);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        children: [
+          // Selection controls row when in selection mode
+          if (_isSelecting)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Text(
+                    '${_selectedEventIds.length} selected',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _isSelecting = false;
+                        _selectedEventIds.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.close),
+                    label: const Text('Cancel'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed:
+                        _selectedEventIds.isEmpty
+                            ? null
+                            : () => _deleteSelectedEvents(),
+                    icon: const Icon(Icons.delete),
+                    label: const Text('Delete'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE94B4B),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Container(
+            width: double.infinity,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: 10,
+                headingRowHeight: 56,
+                dataRowMinHeight: 60,
+                dataRowMaxHeight: 60,
+                dividerThickness: 0,
+                showCheckboxColumn: _isSelecting,
+                headingRowColor: WidgetStateProperty.all(Colors.transparent),
+                border: TableBorder(
+                  horizontalInside: BorderSide.none,
+                  top: BorderSide.none,
+                  bottom: BorderSide.none,
+                ),
+                columns: [
+                  if (_isSelecting)
+                    const DataColumn(label: Text('')), // checkbox column
+                  const DataColumn(
+                    label: Text(
+                      'Category',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const DataColumn(
+                    label: Text(
+                      'Title',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const DataColumn(
+                    label: Text(
+                      'Status',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const DataColumn(
+                    label: Text(
+                      'Date',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+                rows:
+                    paginatedEvents.map((event) {
+                      return DataRow(
+                        selected:
+                            _isSelecting &&
+                            _selectedEventIds.contains(event['event_id']),
+                        onSelectChanged: (selected) {
+                          if (_isSelecting) {
+                            setState(() {
+                              if (selected!) {
+                                _selectedEventIds.add(event['event_id']);
+                              } else {
+                                _selectedEventIds.remove(event['event_id']);
+                              }
+                            });
+                          } else {
+                            showDialog(
+                              context: context,
+                              builder: (context) {
+                                return _buildEventDetailDialog(
+                                  event,
+                                ); // move dialog logic into helper
+                              },
+                            );
+                          }
+                        },
+                        onLongPress: () {
+                          // Start selection mode on long press if not already selecting
+                          if (!_isSelecting) {
+                            setState(() {
+                              _isSelecting = true;
+                              _selectedEventIds.add(event['event_id']);
+                            });
+                          }
+                        },
+                        cells: [
+                          if (_isSelecting)
+                            DataCell(
+                              Container(),
+                            ), // Empty cell for checkbox column
+                          DataCell(
+                            SizedBox(
+                              width: 75,
+                              child: Text(
+                                event['category'] ?? 'Uncategorized',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFFFF5A89),
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: 80,
+                              child: Text(
+                                event['title'] ?? 'Untitled',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: 70,
+                              child: Text(
+                                event['event_status'] ?? 'Unknown',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: 65,
+                              child: Text(
+                                formatDate(event['event_date'] ?? ''),
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+              ),
+            ),
+          ),
+          // Pagination controls UI
+          // ADDED: Pagination controls UI with the design you requested
+          if (events.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Previous page button
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios, size: 16),
+                        onPressed:
+                            _currentPage > 1
+                                ? () {
+                                  setState(() {
+                                    _currentPage--;
+                                  });
+                                }
+                                : null,
+                        color:
+                            _currentPage > 1
+                                ? const Color(0xFFFF5A89)
+                                : Colors.grey,
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Page number indicators with custom styling
+                      for (int i = 1; i <= _totalPages; i++)
+                        if (_totalPages <= 5 ||
+                            i == 1 ||
+                            i == _totalPages ||
+                            (i >= _currentPage - 1 && i <= _currentPage + 1))
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            // MODIFIED: Use different widgets based on whether page is selected
+                            child:
+                                i == _currentPage
+                                    // Selected page: Circle with pink background
+                                    ? Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFF5A89),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '$i',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    // Unselected page: Just the number with onTap
+                                    : InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _currentPage = i;
+                                        });
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Text(
+                                          '$i',
+                                          style: const TextStyle(
+                                            color: Color(0xFF3D3D3D),
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                          )
+                        else if ((i == 2 && _currentPage > 3) ||
+                            (i == _totalPages - 1 &&
+                                _currentPage < _totalPages - 2))
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text('...', style: TextStyle(fontSize: 16)),
+                          ),
+                      const SizedBox(width: 8),
+
+                      // Next page button
+                      IconButton(
+                        icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onPressed:
+                            _currentPage < _totalPages
+                                ? () {
+                                  setState(() {
+                                    _currentPage++;
+                                  });
+                                }
+                                : null,
+                        color:
+                            _currentPage < _totalPages
+                                ? const Color(0xFFFF5A89)
+                                : Colors.grey,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Page info text
+                  Text(
+                    '${events.isEmpty ? 0 : startIndex + 1} - $endIndex of ${events.length} events',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,8 +798,8 @@ void _onSearchChanged() {
                   borderRadius: BorderRadius.circular(40),
                 ),
                 height: 45,
-                child:  TextField(
-                   controller: _searchController,
+                child: TextField(
+                  controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Search',
                     hintStyle: TextStyle(color: Colors.grey),
@@ -135,22 +815,85 @@ void _onSearchChanged() {
               child: Icon(Icons.person, color: Colors.white, size: 25),
             ),
             const SizedBox(width: 15),
-            Stack(
-              children: [
-                const Icon(Icons.notifications_none, color: Colors.black87, size: 35),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
+            // Replace the static Stack with the dynamic notification icon
+            Consumer<NotificationManager>(
+              builder: (context, notificationManager, _) {
+                final unreadCount = notificationManager.unreadCount;
+
+                return GestureDetector(
+                  onTap: () {
+                    final RenderBox button =
+                        context.findRenderObject() as RenderBox;
+                    final position = button.localToGlobal(Offset.zero);
+
+                    showDialog(
+                      context: context,
+                      barrierColor: Colors.transparent,
+                      builder: (BuildContext context) {
+                        return Stack(
+                          children: [
+                            // Notification center popup (now on top and clickable)
+                            Positioned.fill(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => Navigator.of(context).pop(),
+                              ),
+                            ),
+                            // Notification center popup (now on top and clickable)
+                            Positioned(
+                              top: position.dy + 40,
+                              right: 10,
+                              child: const NotificationCenter(),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: Stack(
+                    children: [
+                      const Icon(
+                        Icons.notifications_none,
+                        color: Colors.black87,
+                        size: 35,
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape:
+                                  unreadCount > 9
+                                      ? BoxShape.rectangle
+                                      : BoxShape.circle,
+                              borderRadius:
+                                  unreadCount > 9
+                                      ? BorderRadius.circular(8)
+                                      : null,
+                            ),
+                            child: Center(
+                              child: Text(
+                                unreadCount > 99 ? '99+' : '$unreadCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ],
         ),
@@ -197,10 +940,10 @@ void _onSearchChanged() {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 24, bottom: 30),
+              const Padding(
+                padding: EdgeInsets.only(left: 24, bottom: 30),
                 child: Row(
-                  children: const [
+                  children: [
                     Icon(Icons.logout, color: Colors.white),
                     SizedBox(width: 8),
                     Text(
@@ -291,11 +1034,27 @@ void _onSearchChanged() {
             ),
             const SizedBox(height: 30),
             Expanded(
-             child: _isLoading
-      ? const Center(child: CircularProgressIndicator())
-      : _filteredEvents.isEmpty
-          ? const Center(child: Text('No events found.'))
-          : _buildEventTable(context, _filteredEvents),
+              child:
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                        onRefresh: _loadEvents,
+                        child:
+                            _filteredEvents.isEmpty
+                                ? ListView(
+                                  children: [
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.only(top: 100),
+                                        child: Text('No events found.'),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                                : ListView(
+                                  children: [_buildEventTable(_filteredEvents)],
+                                ),
+                      ),
             ),
           ],
         ),
@@ -303,171 +1062,6 @@ void _onSearchChanged() {
     );
   }
 }
-
-
-Widget _buildEventTable(BuildContext context, List<Map<String, dynamic>> events) {
-  return Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-    ),
-    padding: const EdgeInsets.all(10),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-        // your DataTable columns + rows go here
-                              child: DataTable(
-                        columnSpacing: 10,
-                        headingRowHeight: 56,
-                        dataRowHeight: 60,
-                        dividerThickness: 0,
-                        showCheckboxColumn: false,
-                        headingRowColor: WidgetStateProperty.all(Colors.transparent),
-                        border: TableBorder(
-                          horizontalInside: BorderSide.none,
-                          top: BorderSide.none,
-                          bottom: BorderSide.none,
-                        ),
-                        columns: const [
-                          DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                          DataColumn(label: Text('Title', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                          DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                          DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                        ],
-                        rows: events.map((event) {
-                          return DataRow(
-                            onSelectChanged: (_) {
-                              showDialog(
-                                context: context, 
-                                builder: (context) {
-                                  return AlertDialog(
-                                    backgroundColor: const Color(0xFFFFF6F6),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    contentPadding: const EdgeInsets.all(24),
-                                    content: SingleChildScrollView(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.end,
-                                            children: [
-                                              IconButton(
-                                                icon: const Icon(Icons.close, color: Colors.black54),
-                                                onPressed: () => Navigator.of(context).pop(),
-                                              ),
-                                            ],
-                                          ),
-                                          if (event['image_url'] != null && event['image_url'].toString().isNotEmpty)
-                                            SizedBox(
-                                              height: 180,
-                                              width: double.infinity,
-                                              child: ClipRRect(
-                                                borderRadius: BorderRadius.circular(12),
-                                                child: Image.network(
-                                                  'http://10.0.2.2${event['image_url']}',
-                                                  fit: BoxFit.cover,
-                                                ),
-                                              ),
-                                            ),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            "Title: ${event['title'] ?? 'N/A'}",
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text("Category: ${event['category'] ?? 'N/A'}"),
-                                          Text("Status: ${event['event_status'] ?? 'N/A'}"),
-                                          Text("Date: ${formatDate(event['event_date'] ?? '')}"),
-                                          const SizedBox(height: 8),
-                                          const Text("Content:", style: TextStyle(fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 4),
-                                          HtmlWidget(
-                                            event['content'] ?? 'No content.',
-                                            baseUrl: Uri.parse('http://10.0.2.2/tara-kabataan/'),
-                                          ),
-                                          const SizedBox(height: 20),
-                                          Row(
-                                            children: [
-                                              Spacer(), // pushes buttons to the right
-                                              ElevatedButton.icon(
-                                                onPressed: () async {
-                                                  final confirm = await showDialog<bool>(
-                                                    context: context,
-                                                    builder: (context) => AlertDialog(
-                                                      title: const Text("Delete Event"),
-                                                      content: const Text("Are you sure you want to delete this event?"),
-                                                      actions: [
-                                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-                                                        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
-                                                      ],
-                                                    ),
-                                                  );
-
-                                                  if (confirm == true) {
-                                                    final deleteResponse = await http.post(
-                                                      Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_event.php'),
-                                                      headers: {'Content-Type': 'application/json'},
-                                                      body: jsonEncode({"event_id": event['event_id']}),
-                                                    );
-
-                                                    final deleteResult = jsonDecode(deleteResponse.body);
-                                                    if (deleteResult['success']) {
-                                                      Navigator.of(context).pop(); // Close the modal
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        const SnackBar(content: Text("Event deleted successfully.")),
-                                                      );
-                                                    } else {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        SnackBar(content: Text("Failed to delete: ${deleteResult['error']}")),
-                                                      );
-                                                    }
-                                                  }
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(0xFFE94B4B), // red
-                                                  foregroundColor: Colors.white,
-                                                ),
-                                                icon: const Icon(Icons.delete),
-                                                label: const Text("Delete"),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              ElevatedButton.icon(
-                                                onPressed: () {
-                                                  Navigator.of(context).pop(); // Close the current view modal
-                                                  showEventDialog(context, isEdit: true, eventData: event);
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(0xFF4DB1E3), // blue
-                                                  foregroundColor: Colors.white,
-                                                ),
-                                                icon: const Icon(Icons.edit),
-                                                label: const Text("Edit"),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                            cells: [
-                              DataCell(SizedBox(width: 60, child: Text(event['category'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Color(0xFFFF5A89))))),
-                              DataCell(SizedBox(width: 80, child: Text(event['title'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
-                              DataCell(SizedBox(width: 60, child: Text(event['event_status'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
-                              DataCell(SizedBox(width: 60, child: Text(formatDate(event['event_date'] ?? ''), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10)))),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  );
-}
-
-
 
 Widget _pillButton({required Widget child}) {
   return Container(
@@ -543,14 +1137,18 @@ String getDayOfWeek(int weekday) {
   }
 }
 
-Future<void> openMapPicker(BuildContext context, TextEditingController venueController) async {
+Future<void> openMapPicker(
+  BuildContext context,
+  TextEditingController venueController,
+) async {
   final LatLng? pickedLocation = await Navigator.push(
     context,
     MaterialPageRoute(builder: (context) => MapPickerScreen()),
   );
 
   if (pickedLocation != null) {
-    venueController.text = '${pickedLocation.latitude}, ${pickedLocation.longitude}';
+    venueController.text =
+        '${pickedLocation.latitude}, ${pickedLocation.longitude}';
   }
 }
 
@@ -558,7 +1156,9 @@ Future<void> openMapPicker(BuildContext context, TextEditingController venueCont
 Future<String?> uploadEventImage(img_picker.XFile imageFile) async {
   var request = http.MultipartRequest(
     'POST',
-    Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event_image.php'),
+    Uri.parse(
+      'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event_image.php',
+    ),
   );
 
   request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
@@ -605,6 +1205,14 @@ Future<void> showEventDialog(
     selectedStatus = eventData['event_status'];
     uploadedImageUrl = eventData['image_url'];
     dateController.text = eventData['event_date'] ?? '';
+    if (dateController.text.isNotEmpty) {
+      try {
+        final parsedDate = DateTime.parse(dateController.text);
+        dayController.text = getDayOfWeek(parsedDate.weekday);
+      } catch (_) {
+        dayController.text = '';
+      }
+    }
     timeController.text = eventData['event_start_time'] ?? '';
     timeControllerEnd.text = eventData['event_end_time'] ?? '';
   }
@@ -615,6 +1223,8 @@ Future<void> showEventDialog(
     builder: (BuildContext context) {
       return StatefulBuilder(
         builder: (context, setModalState) {
+          final htmlEditorController = HtmlEditorController();
+
           return Dialog(
             backgroundColor: const Color(0xFFFFF6F6),
             insetPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -645,14 +1255,21 @@ Future<void> showEventDialog(
                           ),
                           GestureDetector(
                             onTap: () => Navigator.of(context).pop(),
-                            child: const Icon(Icons.close, size: 28, color: Colors.black54),
+                            child: const Icon(
+                              Icons.close,
+                              size: 28,
+                              color: Colors.black54,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 20),
 
                       // Title
-                      const Text('Title', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Title',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: titleController,
@@ -661,26 +1278,36 @@ Future<void> showEventDialog(
                           fillColor: Colors.white,
                           border: InputBorder.none,
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
 
                       // Image
-                      const Text('Image', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Image',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 6),
                       Container(
                         height: 180,
                         color: Colors.grey[200],
                         alignment: Alignment.center,
-                        child: pickedImage != null
-                            ? Image.file(File(pickedImage!.path), fit: BoxFit.cover)
-                            : (uploadedImageUrl != null
-                                ? Image.network(
-                                    'http://10.0.2.2$uploadedImageUrl',
-                                    fit: BoxFit.cover,
-                                  )
-                                : const Text("Image Preview Here")),
+                        child:
+                            pickedImage != null
+                                ? Image.file(
+                                  File(pickedImage!.path),
+                                  fit: BoxFit.cover,
+                                )
+                                : (uploadedImageUrl != null
+                                    ? Image.network(
+                                      'http://10.0.2.2$uploadedImageUrl',
+                                      fit: BoxFit.cover,
+                                    )
+                                    : const Text("Image Preview Here")),
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -688,15 +1315,19 @@ Future<void> showEventDialog(
                         children: [
                           ElevatedButton(
                             onPressed: () async {
-                              final img_picker.XFile? image =
-                                  await picker.pickImage(source: img_picker.ImageSource.gallery);
+                              final img_picker.XFile? image = await picker
+                                  .pickImage(
+                                    source: img_picker.ImageSource.gallery,
+                                  );
                               if (image != null) {
                                 setModalState(() {
                                   pickedImage = image;
                                 });
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text("Image selected. It will be saved on submit."),
+                                    content: Text(
+                                      "Image selected. It will be saved on submit.",
+                                    ),
                                   ),
                                 );
                               }
@@ -705,9 +1336,17 @@ Future<void> showEventDialog(
                               minimumSize: const Size(100, 20),
                               backgroundColor: const Color(0xFF4DB1E3),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-                              textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 15,
+                                vertical: 5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             child: const Text('Upload'),
                           ),
@@ -723,9 +1362,17 @@ Future<void> showEventDialog(
                               minimumSize: const Size(100, 20),
                               backgroundColor: const Color(0xFFE94B4B),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-                              textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 15,
+                                vertical: 5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             child: const Text('Remove'),
                           ),
@@ -734,7 +1381,10 @@ Future<void> showEventDialog(
                       const SizedBox(height: 12),
 
                       // Category
-                      const Text('Category', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Category',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
                         value: selectedCategory,
@@ -743,266 +1393,379 @@ Future<void> showEventDialog(
                           fillColor: Colors.white,
                           border: InputBorder.none,
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
-                        items: ['KALUSUGAN', 'KALIKASAN', 'KARUNUNGAN', 'KULTURA', 'KASARIAN']
-                            .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
-                            .toList(),
+                        items:
+                            [
+                                  'KALUSUGAN',
+                                  'KALIKASAN',
+                                  'KARUNUNGAN',
+                                  'KULTURA',
+                                  'KASARIAN',
+                                ]
+                                .map(
+                                  (cat) => DropdownMenuItem(
+                                    value: cat,
+                                    child: Text(cat),
+                                  ),
+                                )
+                                .toList(),
                         onChanged: (val) => selectedCategory = val,
                       ),
                       const SizedBox(height: 12),
 
-                      // Venue (Map Picker)
-                      const Text('Venue', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Venue',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: venueController,
-                        readOnly: true,
-                        onTap: () async {
-                          final LatLng? pickedLocation = await Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => MapPickerScreen()),
-                          );
-                          if (pickedLocation != null) {
-                            setModalState(() {
-                              venueController.text =
-                                  '${pickedLocation.latitude}, ${pickedLocation.longitude}';
-                            });
-                          }
-                        },
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           filled: true,
                           fillColor: Colors.white,
                           border: InputBorder.none,
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          suffixIcon:
-                              const Icon(Icons.location_on_outlined, size: 15, color: Colors.grey),
-                          suffixIconConstraints: const BoxConstraints(
-                            minHeight: 24, minWidth: 24, maxHeight: 24, maxWidth: 24,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          suffixIcon: Icon(
+                            Icons.location_on_outlined,
+                            size: 15,
+                            color: Colors.grey,
+                          ),
+                          suffixIconConstraints: BoxConstraints(
+                            minHeight: 24,
+                            minWidth: 24,
+                            maxHeight: 24,
+                            maxWidth: 24,
                           ),
                         ),
+                        onChanged: (val) {
+                          // re-render the iframe below
+                          setModalState(() {});
+                        },
+                      ),
+                      const SizedBox(height: 8),
+
+                      EmbedGoogleMapWidget(address: venueController.text),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Date',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: dateController,
+                                  readOnly: true,
+                                  onTap: () async {
+                                    final now = DateTime.now();
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: now,
+                                      firstDate: now,
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      setModalState(() {
+                                        dateController.text = DateFormat(
+                                          'yyyy-MM-dd',
+                                        ).format(picked);
+                                        dayController.text = getDayOfWeek(
+                                          picked.weekday,
+                                        );
+                                      });
+                                    }
+                                  },
+                                  decoration: const InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    suffixIcon: Icon(
+                                      Icons.calendar_today,
+                                      size: 15,
+                                      color: Colors.grey,
+                                    ),
+                                    suffixIconConstraints: BoxConstraints(
+                                      minHeight: 24,
+                                      minWidth: 24,
+                                      maxHeight: 24,
+                                      maxWidth: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Day',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: dayController,
+                                  readOnly: true,
+                                  decoration: const InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Time Start',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: timeController,
+                                  readOnly: true,
+                                  onTap: () async {
+                                    final picked = await showTimePicker(
+                                      context: context,
+                                      initialTime: TimeOfDay.now(),
+                                    );
+                                    if (picked != null) {
+                                      final selectedDate = DateFormat(
+                                        "yyyy-MM-dd",
+                                      ).parse(dateController.text);
+                                      final dt = DateTime(
+                                        selectedDate.year,
+                                        selectedDate.month,
+                                        selectedDate.day,
+                                        picked.hour,
+                                        picked.minute,
+                                      );
+                                      if (dt.isBefore(DateTime.now())) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              "Start time cannot be in the past.",
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      setModalState(() {
+                                        pickedStartTime = picked;
+                                        timeController.text = picked.format(
+                                          context,
+                                        );
+                                      });
+                                    }
+                                  },
+                                  decoration: const InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    suffixIcon: Icon(
+                                      Icons.access_time,
+                                      size: 15,
+                                      color: Colors.grey,
+                                    ),
+                                    suffixIconConstraints: BoxConstraints(
+                                      minHeight: 24,
+                                      minWidth: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Time End',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: timeControllerEnd,
+                                  readOnly: true,
+                                  onTap: () async {
+                                    final picked = await showTimePicker(
+                                      context: context,
+                                      initialTime: TimeOfDay.now(),
+                                    );
+                                    if (picked != null) {
+                                      if (pickedStartTime == null) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              "Please select the start time first.",
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      final selectedDate = DateFormat(
+                                        "yyyy-MM-dd",
+                                      ).parse(dateController.text);
+                                      final start = DateTime(
+                                        selectedDate.year,
+                                        selectedDate.month,
+                                        selectedDate.day,
+                                        pickedStartTime!.hour,
+                                        pickedStartTime!.minute,
+                                      );
+                                      final end = DateTime(
+                                        selectedDate.year,
+                                        selectedDate.month,
+                                        selectedDate.day,
+                                        picked.hour,
+                                        picked.minute,
+                                      );
+                                      if (end.isBefore(start)) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              "End time cannot be before start.",
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      setModalState(() {
+                                        timeControllerEnd.text = picked.format(
+                                          context,
+                                        );
+                                      });
+                                    }
+                                  },
+                                  decoration: const InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    suffixIcon: Icon(
+                                      Icons.access_time,
+                                      size: 15,
+                                      color: Colors.grey,
+                                    ),
+                                    suffixIconConstraints: BoxConstraints(
+                                      minHeight: 24,
+                                      minWidth: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
 
-                      // Only for "Add" mode: Date, Day, Start & End time
-                   
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 6),
-                                  TextField(
-                                    controller: dateController,
-                                    readOnly: true,
-                                    onTap: () async {
-                                      final now = DateTime.now();
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: now,
-                                        firstDate: now,
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        setModalState(() {
-                                          dateController.text = DateFormat('yyyy-MM-dd').format(picked);
-                                          dayController.text = getDayOfWeek(picked.weekday);
-                                        });
-                                      }
-                                    },
-                                    decoration: InputDecoration(
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      suffixIcon:
-                                          const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
-                                      suffixIconConstraints: const BoxConstraints(
-                                          minHeight: 24, minWidth: 24, maxHeight: 24, maxWidth: 24),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Day', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 6),
-                                  TextField(
-                                    controller: dayController,
-                                    readOnly: true,
-                                    decoration: const InputDecoration(
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding:
-                                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Time Start',
-                                      style: TextStyle(fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 4),
-                                  TextField(
-                                    controller: timeController,
-                                    readOnly: true,
-                                    onTap: () async {
-                                      final picked = await showTimePicker(
-                                        context: context,
-                                        initialTime: TimeOfDay.now(),
-                                      );
-                                      if (picked != null) {
-                                        final selectedDate =
-                                            DateFormat("yyyy-MM-dd").parse(dateController.text);
-                                        final dt = DateTime(selectedDate.year, selectedDate.month,
-                                            selectedDate.day, picked.hour, picked.minute);
-                                        if (dt.isBefore(DateTime.now())) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                                content: Text("Start time cannot be in the past.")),
-                                          );
-                                          return;
-                                        }
-                                        setModalState(() {
-                                          pickedStartTime = picked;
-                                          timeController.text = picked.format(context);
-                                        });
-                                      }
-                                    },
-                                    decoration: const InputDecoration(
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding:
-                                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      suffixIcon: Icon(Icons.access_time, size: 15, color: Colors.grey),
-                                      suffixIconConstraints:
-                                          BoxConstraints(minHeight: 24, minWidth: 24),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Time End',
-                                      style: TextStyle(fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 4),
-                                  TextField(
-                                    controller: timeControllerEnd,
-                                    readOnly: true,
-                                    onTap: () async {
-                                      final picked = await showTimePicker(
-                                        context: context,
-                                        initialTime: TimeOfDay.now(),
-                                      );
-                                      if (picked != null) {
-                                        if (pickedStartTime == null) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                                content:
-                                                    Text("Please select the start time first.")),
-                                          );
-                                          return;
-                                        }
-                                        final selectedDate =
-                                            DateFormat("yyyy-MM-dd").parse(dateController.text);
-                                        final start = DateTime(
-                                            selectedDate.year,
-                                            selectedDate.month,
-                                            selectedDate.day,
-                                            pickedStartTime!.hour,
-                                            pickedStartTime!.minute);
-                                        final end = DateTime(selectedDate.year, selectedDate.month,
-                                            selectedDate.day, picked.hour, picked.minute);
-                                        if (end.isBefore(start)) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                                content: Text("End time cannot be before start.")),
-                                          );
-                                          return;
-                                        }
-                                        setModalState(() {
-                                          timeControllerEnd.text = picked.format(context);
-                                        });
-                                      }
-                                    },
-                                    decoration: const InputDecoration(
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding:
-                                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      suffixIcon: Icon(Icons.access_time, size: 15, color: Colors.grey),
-                                      suffixIconConstraints:
-                                          BoxConstraints(minHeight: 24, minWidth: 24),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                      
-
                       // Status (with limited choices when editing)
-                      const Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Status',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 6),
-                      isEdit? DropdownButtonFormField<String>(
-                          value: selectedStatus,
-                          decoration: const InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isEdit
+                          ? DropdownButtonFormField<String>(
+                            value: selectedStatus,
+                            decoration: const InputDecoration(
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                            items:
+                                [
+                                      'UPCOMING',
+                                      'CANCELLED',
+                                      'COMPLETED',
+                                      'ONGOING',
+                                    ]
+                                    .map(
+                                      (stat) => DropdownMenuItem(
+                                        value: stat,
+                                        child: Text(stat),
+                                      ),
+                                    )
+                                    .toList(),
+                            onChanged: (val) => selectedStatus = val,
+                          )
+                          : const TextField(
+                            readOnly: true,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              hintText: 'UPCOMING',
+                            ),
                           ),
-                          items: ['UPCOMING', 'CANCELLED']
-                              .map((stat) => DropdownMenuItem(value: stat, child: Text(stat)))
-                              .toList(),
-                          onChanged: (val) => selectedStatus = val,
-                        )
-                      : const TextField(
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            hintText: 'UPCOMING',
-                          ),
-                        ),
                       const SizedBox(height: 12),
 
                       // Speakers
-                      const Text('Speakers', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Speakers',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: speakerController,
@@ -1012,23 +1775,63 @@ Future<void> showEventDialog(
                           fillColor: Colors.white,
                           border: InputBorder.none,
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
 
                       // Content
-                      const Text('Content', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Content',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 6),
-                      TextField(
-                        controller: contentController,
-                        maxLines: 5,
-                        decoration: const InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+
+                      // Create a controller for the HTML Editor
+                      // HTML Editor component
+                      Container(
+                        height: 300, // Adjust height as needed
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: HtmlEditor(
+                          controller: htmlEditorController,
+                          htmlEditorOptions: HtmlEditorOptions(
+                            hint: 'Enter your content here...',
+                            initialText: contentController.text,
+                          ),
+                          htmlToolbarOptions: HtmlToolbarOptions(
+                            toolbarPosition: ToolbarPosition.aboveEditor,
+                            toolbarType: ToolbarType.nativeScrollable,
+                            defaultToolbarButtons: [
+                              StyleButtons(), // Bold, italic, underline buttons
+                              FontButtons(), // Font formatting without parameters
+                              ListButtons(), // Bullet and numbered lists
+                              InsertButtons(
+                                picture: true,
+                              ), // Just enable the image upload
+                            ],
+                          ),
+                          callbacks: Callbacks(
+                            onInit: () {
+                              if (isEdit &&
+                                  eventData != null &&
+                                  eventData['content'] != null) {
+                                htmlEditorController.setText(
+                                  eventData['content'],
+                                );
+                              }
+                            },
+                            onChangeContent: (String? changed) {
+                              if (changed != null) {
+                                contentController.text = changed;
+                              }
+                            },
+                          ),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -1039,23 +1842,36 @@ Future<void> showEventDialog(
                         children: [
                           ElevatedButton(
                             onPressed: () async {
+                              //   final htmlContent = await htmlEditorController.getText();
+                              // contentController.text = htmlContent;
+
                               // Basic validation
                               if (titleController.text.isEmpty ||
-                                  (!isEdit && pickedImage == null && uploadedImageUrl == null)) {
+                                  (!isEdit &&
+                                      pickedImage == null &&
+                                      uploadedImageUrl == null)) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                      content: Text("Title and image are required")),
+                                    content: Text(
+                                      "Title and image are required",
+                                    ),
+                                  ),
                                 );
                                 return;
                               }
 
                               // If a new image was picked, upload it
                               if (pickedImage != null) {
-                                final url = await uploadEventImage(pickedImage!);
+                                final url = await uploadEventImage(
+                                  pickedImage!,
+                                );
                                 if (url == null) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                        content: Text("Image upload failed. Try again.")),
+                                      content: Text(
+                                        "Image upload failed. Try again.",
+                                      ),
+                                    ),
                                   );
                                   return;
                                 }
@@ -1066,9 +1882,12 @@ Future<void> showEventDialog(
                               final payload = <String, dynamic>{
                                 if (isEdit) 'event_id': eventData!['event_id'],
                                 'title': titleController.text,
-                                'category': selectedCategory ?? 'Uncategorized',
+                                'category': selectedCategory ?? 'KALUSUGAN',
                                 'event_venue': venueController.text,
-                                'event_status': isEdit ? (selectedStatus ?? 'UPCOMING') : 'UPCOMING',
+                                'event_status':
+                                    isEdit
+                                        ? (selectedStatus ?? 'UPCOMING')
+                                        : 'UPCOMING',
                                 'event_speakers': speakerController.text,
                                 'content': contentController.text,
                                 'image_url': uploadedImageUrl,
@@ -1077,9 +1896,11 @@ Future<void> showEventDialog(
                                 'event_end_time': timeControllerEnd.text,
                               };
 
-                              final uri = Uri.parse(isEdit
-                                  ? 'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/update_event.php'
-                                  : 'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event.php');
+                              final uri = Uri.parse(
+                                isEdit
+                                    ? 'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/update_event.php'
+                                    : 'http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/add_new_event.php',
+                              );
 
                               final response = await http.post(
                                 uri,
@@ -1091,28 +1912,50 @@ Future<void> showEventDialog(
                               if (result['success'] == true) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(isEdit
-                                        ? "Event updated successfully"
-                                        : "Event added successfully"),
+                                    content: Text(
+                                      isEdit
+                                          ? "Event updated successfully"
+                                          : "Event added successfully",
+                                    ),
                                   ),
                                 );
+
+                                // Add notification code here
+                                final notificationManager =
+                                    Provider.of<NotificationManager>(
+                                      context,
+                                      listen: false,
+                                    );
+                                notificationManager.addNotification(
+                                  isEdit ? "Event Updated" : "Event Added",
+                                  isEdit
+                                      ? "The event '${titleController.text}' was updated successfully"
+                                      : "New event '${titleController.text}' was added successfully",
+                                );
+
                                 Navigator.of(context).pop(); // Close modal
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text("Error: ${result['error']}")),
+                                  SnackBar(
+                                    content: Text("Error: ${result['error']}"),
+                                  ),
                                 );
                               }
                             },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size(150, 20),
-                              backgroundColor: isEdit
-                                  ? const Color.fromARGB(255, 54, 230, 139)
-                                  : const Color.fromARGB(255, 54, 230, 139),
+                              backgroundColor:
+                                  isEdit
+                                      ? const Color.fromARGB(255, 54, 230, 139)
+                                      : const Color.fromARGB(255, 54, 230, 139),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 15, vertical: 5),
+                                horizontal: 15,
+                                vertical: 5,
+                              ),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(6)),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
                             ),
                             child: Text(
                               isEdit ? 'Save Changes' : 'Add Event',

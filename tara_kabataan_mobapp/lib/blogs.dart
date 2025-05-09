@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'events.dart';
-import 'settings.dart';
+import 'settings/settings.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -43,7 +43,11 @@ class _BlogsPageState extends State<BlogsPage> {
   Map<int, bool> selectedRows = {};
   bool isBulkSelecting = false;
   List<Map<String, dynamic>> _blogs = [];
+  List<Map<String, dynamic>> _filteredBlogs = [];
   bool isLoading = false;
+  int _currentPage = 1;
+  int _itemsPerPage = 10;
+  int _totalPages = 1;
 
   void toggleBulkSelection() {
     setState(() {
@@ -81,6 +85,8 @@ class _BlogsPageState extends State<BlogsPage> {
       final blogs = await fetchBlogs();
       setState(() {
         _blogs = blogs;
+        _filteredBlogs = blogs;
+        _totalPages = (_blogs.length / _itemsPerPage).ceil();
         isLoading = false;
       });
     } catch (e) {
@@ -88,15 +94,21 @@ class _BlogsPageState extends State<BlogsPage> {
         isLoading = false;
       });
       // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading blogs: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading blogs: $e')),
+        );
+      }
     }
   }
 
   // Function to refresh blogs after adding a new one
-  void _refreshBlogs() {
-    _loadBlogs();
+  Future<void> _refreshBlogs() async {
+    await _loadBlogs();
+    setState(() {
+      _currentPage = 1;
+    });
+    return Future.value();
   }
 
   // Function to delete a blog
@@ -145,6 +157,14 @@ class _BlogsPageState extends State<BlogsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Calculate pagination
+    final int startIndex = (_currentPage - 1) * _itemsPerPage;
+    final int endIndex = startIndex + _itemsPerPage > _filteredBlogs.length 
+        ? _filteredBlogs.length 
+        : startIndex + _itemsPerPage;
+    final List<Map<String, dynamic>> paginatedBlogs = 
+        _filteredBlogs.isEmpty ? [] : _filteredBlogs.sublist(startIndex, endIndex);
+    
     return Scaffold(
       backgroundColor: const Color(0xFFFFF6F6),
       appBar: AppBar(
@@ -232,34 +252,20 @@ class _BlogsPageState extends State<BlogsPage> {
                       _SidebarButton(
                         icon: Icons.event_outlined,
                         label: 'Events',
-                        onTap: () => _navigateTo(context, const EventsPage()),
+                        onTap: () {
+                          _navigateTo(context, const EventsPage());
+                        },
                       ),
                       const SizedBox(height: 12),
                       _SidebarButton(
                         icon: Icons.settings_outlined,
                         label: 'Settings',
-                        onTap: () => _navigateTo(context, const SettingsPage()),
+                        onTap: () {
+                          _navigateTo(context, const SettingsPage());
+                        },
                       ),
                     ],
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 24, bottom: 30),
-                child: Row(
-                  children: const [
-                    Icon(Icons.logout, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      'Log Out',
-                      style: TextStyle(
-                        fontFamily: 'Bogart',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 25,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ],
@@ -267,7 +273,7 @@ class _BlogsPageState extends State<BlogsPage> {
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -277,10 +283,9 @@ class _BlogsPageState extends State<BlogsPage> {
                 const Text(
                   'BLOGS',
                   style: TextStyle(
-                    fontFamily: 'Bogart',
-                    fontWeight: FontWeight.w900,
-                    fontSize: 30,
-                    color: Color(0xFF3D3D3D),
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
                 ),
                 GestureDetector(
@@ -367,345 +372,399 @@ class _BlogsPageState extends State<BlogsPage> {
             const SizedBox(height: 30),
 
             Expanded(
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: fetchBlogs(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No blogs found.'));
-                  }
-
-                  final blogs = snapshot.data!;
-                  _blogs = blogs; // Store blogs in class variable for bulk selection
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    padding: const EdgeInsets.all(10),
-                    child: isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _blogs.isEmpty
-                        ? const Center(child: Text('No blogs found'))
-                        : Column(
-                          children: [
-                            Expanded(
-                              child: Scrollbar(
-                                thumbVisibility: false,
-                                trackVisibility: false,
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.vertical,
-                                  child: Scrollbar(
-                                    thumbVisibility: false,
-                                    trackVisibility: false,
-                                    scrollbarOrientation: ScrollbarOrientation.bottom,
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: DataTable(
-                            columnSpacing: 10,
-                            headingRowHeight: 56,
-                            dataRowHeight: 60,
-                            dividerThickness: 0,
-                            showCheckboxColumn: false, // Remove built-in checkbox column
-                            headingRowColor: MaterialStateProperty.all(
-                              Colors.transparent,
-                            ),
-                        border: TableBorder(
-                          horizontalInside: BorderSide.none,
-                          top: BorderSide.none,
-                          bottom: BorderSide.none,
-                        ),
-                        columns: const [
-                          DataColumn(label: SizedBox.shrink()), // Checkbox column
-                          DataColumn(
-                            label: Text(
-                              'Category',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(10),
+                child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredBlogs.isEmpty
+                    ? const Center(child: Text('No blogs found'))
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: RefreshIndicator(
+                              onRefresh: _refreshBlogs,
+                              color: const Color(0xFFFF5A89),
+                              backgroundColor: Colors.white,
+                              displacement: 40,
+                              strokeWidth: 3,
+                              child: SingleChildScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                child: DataTable(
+                                  columnSpacing: 10,
+                                  headingRowHeight: 56,
+                                  dataRowHeight: 60,
+                                  dividerThickness: 0,
+                                  showCheckboxColumn: false,
+                                  headingRowColor: MaterialStateProperty.all(
+                                    Colors.transparent,
+                                  ),
+                                  border: TableBorder(
+                                    horizontalInside: BorderSide.none,
+                                    top: BorderSide.none,
+                                    bottom: BorderSide.none,
+                                  ),
+                                  columns: const [
+                                    DataColumn(label: SizedBox.shrink()),
+                                    DataColumn(
+                                      label: Text(
+                                        'Category',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    DataColumn(
+                                      label: Text(
+                                        'Title',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    DataColumn(
+                                      label: Text(
+                                        'Status',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    DataColumn(
+                                      label: Text(
+                                        'Date',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  rows: paginatedBlogs.asMap().entries.map((entry) {
+                                    final index = entry.key;
+                                    final blog = entry.value;
+                                    
+                                    return DataRow(
+                                      onSelectChanged: (selected) {
+                                        if (selected == true) {
+                                          showBlogDetailsDialog(blog);
+                                        }
+                                      },
+                                      cells: [
+                                        DataCell(
+                                          Checkbox(
+                                            value: selectedRows[index] ?? false,
+                                            onChanged: (bool? value) {
+                                              setState(() {
+                                                selectedRows[index] = value ?? false;
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                        DataCell(
+                                          SizedBox(
+                                            width: 80,
+                                            child: Text(
+                                              blog['category'] ?? '',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                color: Color(0xFFFF5A89),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          SizedBox(
+                                            width: 80,
+                                            child: Text(
+                                              blog['title'] ?? '',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 10),
+                                            ),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          SizedBox(
+                                            width: 60,
+                                            child: Text(
+                                              blog['blog_status'] ?? '',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 10),
+                                            ),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          SizedBox(
+                                            width: 60,
+                                            child: Text(
+                                              formatDate(blog['created_at'] ?? ''),
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 10),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }).toList(),
+                                ),
                               ),
                             ),
                           ),
-                          DataColumn(
-                            label: Text(
-                              'Title',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
+                          
+                          // Pagination UI
+                          Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Previous page button
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_left),
+                                  onPressed: _currentPage > 1
+                                      ? () {
+                                          setState(() {
+                                            _currentPage--;
+                                          });
+                                        }
+                                      : null,
+                                  color: _currentPage > 1
+                                      ? const Color(0xFFFF5A89)
+                                      : Colors.grey,
+                                ),
+                                
+                                // Page numbers
+                                for (int i = 1; i <= _totalPages; i++)
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _currentPage = i;
+                                      });
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 5),
+                                      width: 30,
+                                      height: 30,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: _currentPage == i
+                                            ? const Color(0xFFFF5A89)
+                                            : Colors.white,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '$i',
+                                          style: TextStyle(
+                                            color: _currentPage == i
+                                                ? Colors.white
+                                                : Colors.black,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                // Next page button
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right),
+                                  onPressed: _currentPage < _totalPages
+                                      ? () {
+                                          setState(() {
+                                            _currentPage++;
+                                          });
+                                        }
+                                      : null,
+                                  color: _currentPage < _totalPages
+                                      ? const Color(0xFFFF5A89)
+                                      : Colors.grey,
+                                ),
+                              ],
                             ),
                           ),
-                          DataColumn(
-                            label: Text(
-                              'Status',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          DataColumn(
-                            label: Text(
-                              'Date',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
+                          
+                          // Page info text
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Text(
+                              '${((_currentPage - 1) * _itemsPerPage) + 1} - ${_currentPage * _itemsPerPage > _filteredBlogs.length ? _filteredBlogs.length : _currentPage * _itemsPerPage} of ${_filteredBlogs.length} blogs',
+                              style: const TextStyle(
+                                color: Colors.grey,
                                 fontSize: 12,
                               ),
                             ),
                           ),
                         ],
-                        rows: blogs.asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final blog = entry.value;
-                              
-                              // Function to show blog details dialog
-                              void showBlogDetailsDialog() {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return Dialog(
-                                      insetPadding: const EdgeInsets.symmetric(horizontal: 20),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        alignment: Alignment.topRight,
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                                            width: double.infinity,
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                // Close button
-                                                Align(
-                                                  alignment: Alignment.topRight,
-                                                  child: IconButton(
-                                                    icon: const Icon(Icons.close, color: Colors.black54),
-                                                    onPressed: () => Navigator.of(context).pop(),
-                                                    padding: EdgeInsets.zero,
-                                                    constraints: const BoxConstraints(),
-                                                  ),
-                                                ),
-                                                
-                                                // Image
-                                                if (blog['image_url'] != null && blog['image_url'].toString().isNotEmpty)
-                                                  ClipRRect(
-                                                    borderRadius: BorderRadius.circular(12),
-                                                    child: Image.network(
-                                                      'http://10.0.2.2/tara-kabataan/tara-kabataan-webapp/uploads/blogs-images/${blog['image_url']}',
-                                                      height: 180,
-                                                      width: double.infinity,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (context, error, stackTrace) {
-                                                        return Container(
-                                                          height: 180,
-                                                          width: double.infinity,
-                                                          color: Colors.grey[300],
-                                                          child: const Center(child: Text('Image not available')),
-                                                        );
-                                                      },
-                                                    ),
-                                                  ),
-                                                const SizedBox(height: 16),
-                                                
-                                                // Title
-                                                Text(
-                                                  "Title: ${blog['title'] ?? 'N/A'}",
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                
-                                                // Metadata
-                                                Text(
-                                                  "Category: ${blog['category'] ?? 'N/A'}",
-                                                  style: const TextStyle(fontSize: 14),
-                                                ),
-                                                Text(
-                                                  "Status: ${blog['blog_status'] ?? 'N/A'}",
-                                                  style: const TextStyle(fontSize: 14),
-                                                ),
-                                                Text(
-                                                  "Date: ${formatDate(blog['created_at'] ?? '')}",
-                                                  style: const TextStyle(fontSize: 14),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                
-                                                // Content section
-                                                const Text(
-                                                  "Content:",
-                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                ConstrainedBox(
-                                                  constraints: const BoxConstraints(maxHeight: 300),
-                                                  child: SingleChildScrollView(
-                                                    child: HtmlWidget(
-                                                      blog['content'] ?? 'No content.',
-                                                      baseUrl: Uri.parse('http://10.0.2.2/tara-kabataan/'),
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 20),
-                                                
-                                                // Action buttons
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    ElevatedButton.icon(
-                                                      onPressed: () async {
-                                                        // Delete functionality
-                                                        final confirm = await showDialog<bool>(
-                                                          context: context,
-                                                          builder: (context) => AlertDialog(
-                                                            title: const Text("Delete Blog"),
-                                                            content: const Text("Are you sure you want to delete this blog?"),
-                                                            actions: [
-                                                              TextButton(
-                                                                onPressed: () => Navigator.of(context).pop(false),
-                                                                child: const Text("Cancel"),
-                                                              ),
-                                                              TextButton(
-                                                                onPressed: () => Navigator.of(context).pop(true),
-                                                                child: const Text("Delete", style: TextStyle(color: Colors.red)),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ) ?? false;
-
-                                                        if (confirm) {
-                                                          Navigator.of(context).pop(); // Close the blog details dialog
-                                                          final success = await _deleteBlog(blog['id']);
-                                                          if (success) {
-                                                            ScaffoldMessenger.of(context).showSnackBar(
-                                                              const SnackBar(content: Text('Blog deleted successfully')),
-                                                            );
-                                                          }
-                                                        }
-                                                      },
-                                                      icon: const Icon(Icons.delete, color: Colors.white),
-                                                      label: const Text('Delete', style: TextStyle(color: Colors.white)),
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor: Colors.red[400],
-                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 16),
-                                                    ElevatedButton.icon(
-                                                      onPressed: () {
-                                                        // Edit functionality
-                                                        Navigator.of(context).pop();
-                                                      },
-                                                      icon: const Icon(Icons.edit, color: Colors.white),
-                                                      label: const Text('Edit', style: TextStyle(color: Colors.white)),
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor: Colors.blue[400],
-                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                );
-                              }
-                              
-                              return DataRow(
-                                // Enable row selection for showing dialog
-                                onSelectChanged: (value) {
-                                  if (value == true) {
-                                    showBlogDetailsDialog();
-                                  }
-                                },
-                                cells: [
-                                  // Checkbox cell - separate functionality
-                                  DataCell(
-                                    Checkbox(
-                                      value: selectedRows[index] ?? false,
-                                      onChanged: (bool? value) {
-                                        setState(() {
-                                          selectedRows[index] = value ?? false;
-                                        });
-                                      },
-                                    ),
-                                    // Empty onTap to prevent row selection when clicking the checkbox
-                                    onTap: () {},
-                                  ),
-                                  // Category cell
-                                  DataCell(
-                                    SizedBox(
-                                      width: 60,
-                                      child: Text(
-                                        blog['category'] ?? '',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: Color(0xFFFF5A89),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  // Title cell
-                                  DataCell(
-                                    SizedBox(
-                                      width: 80,
-                                      child: Text(
-                                        blog['title'] ?? '',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 10),
-                                      ),
-                                    ),
-                                  ),
-                                  // Status cell
-                                  DataCell(
-                                    SizedBox(
-                                      width: 60,
-                                      child: Text(
-                                        blog['blog_status'] ?? '',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 10),
-                                      ),
-                                    ),
-                                  ),
-                                  // Date cell
-                                  DataCell(
-                                    SizedBox(
-                                      width: 60,
-                                      child: Text(
-                                        formatDate(blog['created_at'] ?? ''),
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 10),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
                       ),
-                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                  );
-                },
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  void showBlogDetailsDialog(Map<String, dynamic> blog) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topRight,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                width: double.infinity,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Close button
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.black54),
+                        onPressed: () => Navigator.of(context).pop(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ),
+                    
+                    // Image
+                    if (blog['image_url'] != null && blog['image_url'].toString().isNotEmpty)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          'http://10.0.2.2/tara-kabataan/tara-kabataan-webapp/uploads/blogs-images/${blog['image_url']}',
+                          height: 180,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              height: 180,
+                              width: double.infinity,
+                              color: Colors.grey[300],
+                              child: const Center(child: Text('Image not available')),
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    
+                    // Title
+                    Text(
+                      "Title: ${blog['title'] ?? 'N/A'}",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Metadata
+                    Text(
+                      "Category: ${blog['category'] ?? 'N/A'}",
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    Text(
+                      "Status: ${blog['blog_status'] ?? 'N/A'}",
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    Text(
+                      "Date: ${formatDate(blog['created_at'] ?? '')}",
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Content section
+                    const Text(
+                      "Content:",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      child: SingleChildScrollView(
+                        child: HtmlWidget(
+                          blog['content'] ?? 'No content.',
+                          baseUrl: Uri.parse('http://10.0.2.2/tara-kabataan/'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Action buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            // Delete functionality
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text("Delete Blog"),
+                                content: const Text("Are you sure you want to delete this blog?"),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(false),
+                                    child: const Text("Cancel"),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(true),
+                                    child: const Text("Delete", style: TextStyle(color: Colors.red)),
+                                  ),
+                                ],
+                              ),
+                            ) ?? false;
+
+                            if (confirm) {
+                              Navigator.of(context).pop(); // Close the blog details dialog
+                              final success = await _deleteBlog(blog['blog_id']);
+                              if (success) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Blog deleted successfully')),
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.delete, color: Colors.white),
+                          label: const Text('Delete', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red[400],
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            // Edit functionality
+                            Navigator.of(context).pop();
+                          },
+                          icon: const Icon(Icons.edit, color: Colors.white),
+                          label: const Text('Edit', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[400],
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
