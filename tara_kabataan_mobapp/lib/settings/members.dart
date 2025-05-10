@@ -16,25 +16,19 @@ class MembersTab extends StatefulWidget {
 
 class _MembersTabState extends State<MembersTab> {
   late Future<List<Map<String, dynamic>>> _membersFuture;
-
-  // Hardcoded roles with role_id and role_name
-  final List<Map<String, String>> _roles = [
-    {"role_id": "roles-2025-000001", "role_name": "President"},
-    {"role_id": "roles-2025-000002", "role_name": "Vice President"},
-    {"role_id": "roles-2025-000003", "role_name": "Secretary"},
-    {"role_id": "roles-2025-000004", "role_name": "Treasurer"},
-    {"role_id": "roles-2025-000005", "role_name": "Auditor"},
-    {"role_id": "roles-2025-000006", "role_name": "P.R.O"},
-    {"role_id": "roles-2025-000007", "role_name": "Committee Head"},
-    {"role_id": "roles-2025-000008", "role_name": "Committee Member"},
-    {"role_id": "roles-2025-000009", "role_name": "Council Member"},
-    {"role_id": "roles-2025-00000A", "role_name": "Adviser"},
-  ];
+  late Future<List<Map<String, dynamic>>> _rolesFuture;
+  List<Map<String, dynamic>> _roles = []; // Will be populated from API
 
   @override
   void initState() {
     super.initState();
     _membersFuture = fetchMembers();
+    _rolesFuture = fetchRoles();
+    _rolesFuture.then((roles) {
+      setState(() {
+        _roles = roles;
+      });
+    });
   }
 
   Future<List<Map<String, dynamic>>> fetchMembers() async {
@@ -49,6 +43,27 @@ class _MembersTabState extends State<MembersTab> {
       }
     }
     throw Exception('Failed to load members');
+  }
+
+  Future<List<Map<String, dynamic>>> fetchRoles() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/roles.php'),
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        if (json['success'] == true) {
+          return List<Map<String, dynamic>>.from(json['roles']);
+        }
+      }
+      // If there's an error, return an empty list
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching roles: $e');
+      // Return empty list on error
+      return [];
+    }
   }
 
   void _showMemberDialog(Map<String, dynamic> member) {
@@ -183,24 +198,39 @@ class _MembersTabState extends State<MembersTab> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedRoleId,
-                  hint: const Text('Select Role'),
-                  isExpanded: true,
-                  items: _roles
-                      .map((role) => DropdownMenuItem(
-                            value: role['role_id'],
-                            child: Text(role['role_name']!),
-                          ))
-                      .toList(),
-                  onChanged: (val) => setDialogState(() => selectedRoleId = val),
-                  decoration: const InputDecoration(
-                    labelText: 'Role',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  validator: (value) => value == null ? 'Please select a role' : null,
-                ),
+                _roles.isEmpty
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    )
+                  : DropdownButtonFormField<String>(
+                      value: selectedRoleId,
+                      hint: const Text('Select Role'),
+                      isExpanded: true,
+                      items: _roles
+                          .map((role) => DropdownMenuItem(
+                                value: role['role_id'].toString(),
+                                child: Text(role['role_name'].toString()),
+                              ))
+                          .toList(),
+                      onChanged: (val) => setDialogState(() => selectedRoleId = val),
+                      decoration: const InputDecoration(
+                        labelText: 'Role',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      validator: (value) => value == null ? 'Please select a role' : null,
+                    ),
               ],
             ),
           ),
@@ -346,179 +376,39 @@ class _MembersTabState extends State<MembersTab> {
   }
 
   Future<void> _deleteMember(String memberId) async {
-    // Store the member name for local filtering if API call succeeds but DB doesn't update
-    String? memberNameToRemove;
-    
-    // Get the current list of members to find the member name
-    final currentMembers = await _membersFuture;
-    for (var member in currentMembers) {
-      if (member['member_id'] == memberId) {
-        memberNameToRemove = member['member_name'];
-        break;
-      }
-    }
-    
-    // Close any open dialogs first
+    // First close the member details dialog
     Navigator.of(context).pop();
     
-    // Show a styled confirmation dialog
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFFFFF6F6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Color(0xFFE94B4B), size: 28),
-            const SizedBox(width: 8),
-            const Text(
-              "Delete Member",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: const Text(
-          "Are you sure you want to delete this member? This action cannot be undone.",
-          style: TextStyle(fontSize: 15),
-        ),
+        title: const Text("Delete Member"),
+        content: const Text("Are you sure you want to delete this member?"),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            style: TextButton.styleFrom(foregroundColor: Colors.grey),
-            child: const Text("CANCEL"),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE94B4B),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text("DELETE"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
         ],
       ),
     );
 
     if (confirm == true) {
-      // Show a simple loading indicator in a snackbar instead of a dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-              SizedBox(width: 16),
-              Text("Deleting member..."),
-            ],
-          ),
-          duration: Duration(seconds: 60), // Long duration that will be dismissed manually
-        ),
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_member.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({"member_id": memberId}),
       );
-      
-      bool deleteSuccess = false;
-      String errorMessage = "";
-      
-      try {
-        // First try the delete_member.php endpoint (for new members)
-        try {
-          final response = await http.post(
-            Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/delete_member.php'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({"member_id": memberId}),
-          ).timeout(
-            const Duration(seconds: 8),
-            onTimeout: () => http.Response('{"success": false, "error": "Request timed out"}', 408),
-          );
 
-          // Try to parse the response
-          if (response.statusCode != 408) {
-            final responseBody = response.body.trim();
-            if (!responseBody.startsWith('<') && !responseBody.contains('<!DOCTYPE')) {
-              final result = jsonDecode(response.body);
-              if (result['success'] == true) {
-                deleteSuccess = true;
-              }
-            }
-          }
-        } catch (e) {
-          print("First delete attempt failed: $e");
-        }
-        
-        // If first attempt failed, try the members.php endpoint with action=delete (for old members)
-        if (!deleteSuccess) {
-          try {
-            final response = await http.post(
-              Uri.parse('http://10.0.2.2/tara-kabataan/tara-kabataan-backend/api/members.php'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({"action": "delete", "member_id": memberId}),
-            ).timeout(
-              const Duration(seconds: 8),
-              onTimeout: () => http.Response('{"success": false, "error": "Request timed out"}', 408),
-            );
-
-            // Try to parse the response
-            if (response.statusCode != 408) {
-              final responseBody = response.body.trim();
-              if (!responseBody.startsWith('<') && !responseBody.contains('<!DOCTYPE')) {
-                final result = jsonDecode(response.body);
-                if (result['success'] == true) {
-                  deleteSuccess = true;
-                } else {
-                  errorMessage = result['error'] ?? "Unknown error";
-                }
-              }
-            }
-          } catch (e) {
-            print("Second delete attempt failed: $e");
-            errorMessage = "Failed to delete member";
-          }
-        }
-
-        // Hide the loading snackbar
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        
-        if (deleteSuccess || memberNameToRemove != null) {
-          // Even if the API returns success but the member isn't actually deleted from the database,
-          // we'll filter it out locally to give the appearance of successful deletion
-          setState(() {
-            // Update the UI immediately by filtering out the deleted member
-            _membersFuture = _membersFuture.then((members) {
-              return members.where((member) => 
-                member['member_id'] != memberId && 
-                (memberNameToRemove == null || member['member_name'] != memberNameToRemove)
-              ).toList();
-            });
-          });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Member deleted successfully"),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Failed to delete: $errorMessage"),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      } catch (e) {
-        // Hide the loading snackbar
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        
+      final result = jsonDecode(response.body);
+      if (result['success'] == true) {
+        setState(() {
+          _membersFuture = fetchMembers();
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: ${e.toString().replaceAll('Exception: ', '')}"),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 3),
-          ),
+          const SnackBar(content: Text("Member deleted successfully.")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to delete: ${result['error']}")),
         );
       }
     }
@@ -577,24 +467,39 @@ class _MembersTabState extends State<MembersTab> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedRoleId,
-                  hint: const Text('Select Role'),
-                  isExpanded: true,
-                  items: _roles
-                      .map((role) => DropdownMenuItem(
-                            value: role['role_id'],
-                            child: Text(role['role_name']!),
-                          ))
-                      .toList(),
-                  onChanged: (val) => setDialogState(() => selectedRoleId = val),
-                  decoration: const InputDecoration(
-                    labelText: 'Role',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  validator: (value) => value == null ? 'Please select a role' : null,
-                ),
+                _roles.isEmpty
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    )
+                  : DropdownButtonFormField<String>(
+                      value: selectedRoleId,
+                      hint: const Text('Select Role'),
+                      isExpanded: true,
+                      items: _roles
+                          .map((role) => DropdownMenuItem(
+                                value: role['role_id'].toString(),
+                                child: Text(role['role_name'].toString()),
+                              ))
+                          .toList(),
+                      onChanged: (val) => setDialogState(() => selectedRoleId = val),
+                      decoration: const InputDecoration(
+                        labelText: 'Role',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      validator: (value) => value == null ? 'Please select a role' : null,
+                    ),
               ],
             ),
           ),
